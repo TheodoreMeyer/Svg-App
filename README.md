@@ -115,6 +115,3 @@ build/app/outputs/flutter-apk/
 10. Open Diagnostics and confirm it contains route/audio details without passwords.
 11. Leave the call and confirm audio, notification, and websocket stop cleanly.
 
-## Repository Notes
-
-This repository should contain only the Flutter/Android app source, assets, tests, build configuration, README, and license. Local generated files, IDE state, agent folders, signing keys, APK/AAB outputs, and planning handoff notes are intentionally ignored.
