@@ -128,7 +128,7 @@ void main() {
   });
 
   group('packets', () {
-    test('builds Android native join packet for plugin websocket auth', () {
+    test('builds Svg-App join packet for plugin websocket auth', () {
       final packet = joinPacket(
         username: 'PlayerName',
         password: 'secret',
@@ -138,13 +138,14 @@ void main() {
         'type': 'join',
         'username': 'PlayerName',
         'password': 'secret',
-        'client': {
-          'kind': androidClientKind,
-          'version': androidClientVersion,
-          'protocol': androidClientProtocol,
+        'clientType': {
+          'type': svgAppClientType,
+          'serverVersion': targetServerVersion,
         },
       });
+      expect(packet.containsKey('client'), false);
       expect(packet.containsKey('build'), false);
+      expect(packet.containsKey('serverBuild'), false);
     });
 
     test('builds conservative legacy capabilities packet', () {
@@ -230,9 +231,11 @@ void main() {
       expect(socket.calls.take(2).toList(), ['listen', 'add']);
       final sentJoin = jsonDecode(socket.sent.single as String)
           as Map<String, Object?>;
-      final clientInfo = sentJoin['client'] as Map<String, Object?>;
+      final clientType = sentJoin['clientType'] as Map<String, Object?>;
       expect(sentJoin['type'], 'join');
-      expect(clientInfo['kind'], androidClientKind);
+      expect(clientType['type'], svgAppClientType);
+      expect(clientType['serverVersion'], targetServerVersion);
+      expect(sentJoin.containsKey('client'), false);
     });
   });
 

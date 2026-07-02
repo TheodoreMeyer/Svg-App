@@ -1,6 +1,5 @@
-const String androidClientKind = 'android';
-const String androidClientVersion = '1.0.0';
-const int androidClientProtocol = 1;
+const String svgAppClientType = 'Svg-App';
+const String targetServerVersion = '0.1.2';
 const String legacyAudioMode = 'legacy';
 const String svgV2AudioMode = 'svg-v2';
 
@@ -12,10 +11,9 @@ Map<String, Object?> joinPacket({
     'type': 'join',
     'username': username.trim(),
     'password': password,
-    'client': {
-      'kind': androidClientKind,
-      'version': androidClientVersion,
-      'protocol': androidClientProtocol,
+    'clientType': {
+      'type': svgAppClientType,
+      'serverVersion': targetServerVersion,
     },
   };
 }
