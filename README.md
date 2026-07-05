@@ -23,6 +23,10 @@ Current app version: `1.0.0+1`.
 - Local Test Audio monitor for microphone/playback checks.
 - Diagnostics panel with connection, websocket, audio route, native audio devtools, frame counters, mic counters, and chat counters.
 
+## Download
+
+Most users should install the app from the latest GitHub Release. Download the newest `.apk` attached to the release, install it on your Android device, and grant microphone and notification permissions when prompted.
+
 ## Requirements
 
 - Flutter installed locally.
@@ -82,10 +86,6 @@ The diagnostics button opens a compact text panel for bug reports and manual tes
 - Received frame counters and last PCM peak.
 - Mic packet count and chat counters.
 
-## Download
-
-Most users should install the app from the latest GitHub Release. Download the newest `.apk` attached to the release, install it on your Android device, and grant microphone and notification permissions when prompted.
-
 ## Build form source
 
 ```powershell
@@ -101,7 +101,7 @@ The debug APK is generated under:
 build/app/outputs/flutter-apk/
 ```
 
-## Manual Test Checklist
+## Manual Test Checklist (if you come across issues)
 
 1. Install the debug APK on a physical Android device.
 2. Join a SimpleVoice-Geyser server.
