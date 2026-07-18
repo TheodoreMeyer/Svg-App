@@ -6,7 +6,7 @@
 
 Simple Voice App is a Flutter Android companion app for SimpleVoice-Geyser. It lets Bedrock players join voice chat and server chat from an Android device without using the browser WebUI.
 
-Current app version: `1.0.0+1`.
+Current app version: `1.0.1+2`.
 
 ## Current Features
 
