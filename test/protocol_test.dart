@@ -116,10 +116,7 @@ void main() {
     });
 
     test('rejects invalid server urls', () {
-      expect(
-        () => websocketUriForServer(''),
-        throwsA(isA<FormatException>()),
-      );
+      expect(() => websocketUriForServer(''), throwsA(isA<FormatException>()));
       expect(
         () => websocketUriForServer('ftp://example.com'),
         throwsA(isA<FormatException>()),
@@ -129,19 +126,13 @@ void main() {
 
   group('packets', () {
     test('builds Svg-App join packet for plugin websocket auth', () {
-      final packet = joinPacket(
-        username: 'PlayerName',
-        password: 'secret',
-      );
+      final packet = joinPacket(username: 'PlayerName', password: 'secret');
 
       expect(packet, {
         'type': 'join',
         'username': 'PlayerName',
         'password': 'secret',
-        'clientType': {
-          'type': svgAppClientType,
-          'serverVersion': targetServerVersion,
-        },
+        'clientType': {'type': svgAppClientType, 'serverVersion': '0.1.3'},
       });
       expect(packet.containsKey('client'), false);
       expect(packet.containsKey('build'), false);
@@ -229,8 +220,8 @@ void main() {
       );
 
       expect(socket.calls.take(2).toList(), ['listen', 'add']);
-      final sentJoin = jsonDecode(socket.sent.single as String)
-          as Map<String, Object?>;
+      final sentJoin =
+          jsonDecode(socket.sent.single as String) as Map<String, Object?>;
       final clientType = sentJoin['clientType'] as Map<String, Object?>;
       expect(sentJoin['type'], 'join');
       expect(clientType['type'], svgAppClientType);
@@ -252,10 +243,7 @@ void main() {
 
     test('humanizes unsupported Android protocol close reason', () {
       expect(
-        closeMessage(
-          closeCode: 4008,
-          reason: appProtocolUnsupportedReason,
-        ),
+        closeMessage(closeCode: 4008, reason: appProtocolUnsupportedReason),
         appProtocolUnsupportedMessage,
       );
       expect(

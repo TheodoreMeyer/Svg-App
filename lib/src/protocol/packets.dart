@@ -1,5 +1,5 @@
 const String svgAppClientType = 'Svg-App';
-const String targetServerVersion = '0.1.2';
+const String targetServerVersion = '0.1.3';
 const String legacyAudioMode = 'legacy';
 const String svgV2AudioMode = 'svg-v2';
 
@@ -25,11 +25,7 @@ Map<String, Object?> capabilitiesPacket() {
       'protocols': [legacyAudioMode],
       'supportsOpusDecoder': false,
       'secureContext': true,
-      'decoder': {
-        'nativeOpus': false,
-        'opusWasm': false,
-        'webCodecs': false,
-      },
+      'decoder': {'nativeOpus': false, 'opusWasm': false, 'webCodecs': false},
     },
   };
 }
