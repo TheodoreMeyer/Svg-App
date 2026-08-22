@@ -132,11 +132,15 @@ void main() {
         'type': 'join',
         'username': 'PlayerName',
         'password': 'secret',
-        'clientType': {'type': svgAppClientType, 'serverVersion': '0.1.3'},
+        'clientType': {'type': svgAppClientType, 'serverVersion': '0.1.4'},
       });
       expect(packet.containsKey('client'), false);
       expect(packet.containsKey('build'), false);
       expect(packet.containsKey('serverBuild'), false);
+    });
+
+    test('lists supported Android-aware plugin targets in fallback order', () {
+      expect(supportedTargetServerVersions, ['0.1.4', '0.1.3']);
     });
 
     test('builds conservative legacy capabilities packet', () {
@@ -220,13 +224,193 @@ void main() {
       );
 
       expect(socket.calls.take(2).toList(), ['listen', 'add']);
-      final sentJoin =
-          jsonDecode(socket.sent.single as String) as Map<String, Object?>;
+      final sentJoin = _sentJoin(socket);
       final clientType = sentJoin['clientType'] as Map<String, Object?>;
       expect(sentJoin['type'], 'join');
       expect(clientType['type'], svgAppClientType);
       expect(clientType['serverVersion'], targetServerVersion);
       expect(sentJoin.containsKey('client'), false);
+    });
+
+    test(
+      'retries baseline target after initial protocol unsupported close',
+      () async {
+        final sockets = [_FakeVoiceWebSocket(), _FakeVoiceWebSocket()];
+        var connects = 0;
+        final closed = <String>[];
+        final client = SimpleVoiceClient(
+          Uri.parse('ws://voice.example.com/ws'),
+          connector: (_) async => sockets[connects++],
+        );
+
+        await client.connect(
+          username: 'PlayerName',
+          password: 'secret',
+          onControlPacket: (_) {},
+          onAudioFrame: (_) {},
+          onClosed: (code, reason) => closed.add('$code $reason'),
+        );
+
+        var clientType =
+            _sentJoin(sockets[0])['clientType'] as Map<String, Object?>;
+        expect(clientType['serverVersion'], '0.1.4');
+
+        await sockets[0].finish(
+          code: outdatedClientCloseCode,
+          reason: appProtocolUnsupportedReason,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(connects, 2);
+        clientType =
+            _sentJoin(sockets[1])['clientType'] as Map<String, Object?>;
+        expect(clientType['serverVersion'], '0.1.3');
+        expect(closed, isEmpty);
+      },
+    );
+
+    test(
+      'suppresses retryable unsupported-version error before fallback',
+      () async {
+        final sockets = [_FakeVoiceWebSocket(), _FakeVoiceWebSocket()];
+        final packets = <Map<String, Object?>>[];
+        final closed = <String>[];
+        var connects = 0;
+        final client = SimpleVoiceClient(
+          Uri.parse('ws://voice.example.com/ws'),
+          connector: (_) async => sockets[connects++],
+        );
+
+        await client.connect(
+          username: 'PlayerName',
+          password: 'secret',
+          onControlPacket: packets.add,
+          onAudioFrame: (_) {},
+          onClosed: (code, reason) => closed.add('$code $reason'),
+        );
+
+        sockets[0].emit(
+          jsonEncode({
+            'type': 'error',
+            'message': appProtocolUnsupportedMessage,
+          }),
+        );
+        await Future<void>.delayed(Duration.zero);
+        await sockets[0].finish(
+          code: outdatedClientCloseCode,
+          reason: ' $appProtocolUnsupportedReason ',
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        final clientType =
+            _sentJoin(sockets[1])['clientType'] as Map<String, Object?>;
+        expect(connects, 2);
+        expect(clientType['serverVersion'], '0.1.3');
+        expect(packets, isEmpty);
+        expect(closed, isEmpty);
+      },
+    );
+
+    test(
+      'forwards final unsupported-version error after fallback is exhausted',
+      () async {
+        final sockets = [_FakeVoiceWebSocket(), _FakeVoiceWebSocket()];
+        final packets = <Map<String, Object?>>[];
+        final closed = <String>[];
+        var connects = 0;
+        final client = SimpleVoiceClient(
+          Uri.parse('ws://voice.example.com/ws'),
+          connector: (_) async => sockets[connects++],
+        );
+
+        await client.connect(
+          username: 'PlayerName',
+          password: 'secret',
+          onControlPacket: packets.add,
+          onAudioFrame: (_) {},
+          onClosed: (code, reason) => closed.add('$code $reason'),
+        );
+        await sockets[0].finish(
+          code: outdatedClientCloseCode,
+          reason: appProtocolUnsupportedReason,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        sockets[1].emit(
+          jsonEncode({
+            'type': 'error',
+            'message': appProtocolUnsupportedMessage,
+          }),
+        );
+        await Future<void>.delayed(Duration.zero);
+        await sockets[1].finish(
+          code: outdatedClientCloseCode,
+          reason: appProtocolUnsupportedReason,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(connects, 2);
+        expect(packets.single['message'], appProtocolUnsupportedMessage);
+        expect(closed, [
+          '$outdatedClientCloseCode $appProtocolUnsupportedReason',
+        ]);
+      },
+    );
+
+    test('does not retry non-compatibility auth close', () async {
+      final socket = _FakeVoiceWebSocket();
+      var connects = 0;
+      final closed = <String>[];
+      final client = SimpleVoiceClient(
+        Uri.parse('ws://voice.example.com/ws'),
+        connector: (_) async {
+          connects++;
+          return socket;
+        },
+      );
+
+      await client.connect(
+        username: 'PlayerName',
+        password: 'secret',
+        onControlPacket: (_) {},
+        onAudioFrame: (_) {},
+        onClosed: (code, reason) => closed.add('$code $reason'),
+      );
+
+      await socket.finish(code: 4005, reason: 'invalid_client_info');
+
+      expect(connects, 1);
+      expect(closed, ['4005 invalid_client_info']);
+    });
+
+    test('keeps capabilities after successful auth without fallback', () async {
+      final socket = _FakeVoiceWebSocket();
+      final packets = <Map<String, Object?>>[];
+      final client = SimpleVoiceClient(
+        Uri.parse('ws://voice.example.com/ws'),
+        connector: (_) async => socket,
+      );
+
+      await client.connect(
+        username: 'PlayerName',
+        password: 'secret',
+        onControlPacket: packets.add,
+        onAudioFrame: (_) {},
+        onClosed: (code, reason) {
+          throw StateError('Unexpected close: $code $reason');
+        },
+      );
+
+      socket.emit(
+        jsonEncode({'type': 'status', 'message': 'Connected as PlayerName.'}),
+      );
+      await Future<void>.delayed(Duration.zero);
+      client.sendCapabilities();
+
+      expect(packets.single['type'], 'status');
+      expect(socket.sent.length, 2);
+      expect(_sentJoin(socket)['type'], 'join');
+      expect(jsonDecode(socket.sent.last as String), capabilitiesPacket());
     });
   });
 
@@ -337,6 +521,20 @@ class _FakeVoiceWebSocket implements VoiceWebSocket {
   Future<void> close() async {
     await _events.close();
   }
+
+  void emit(Object event) {
+    _events.add(event);
+  }
+
+  Future<void> finish({int? code, String? reason}) async {
+    closeCode = code;
+    closeReason = reason;
+    await _events.close();
+  }
+}
+
+Map<String, Object?> _sentJoin(_FakeVoiceWebSocket socket) {
+  return jsonDecode(socket.sent.first as String) as Map<String, Object?>;
 }
 
 List<int> _u16(int value) {

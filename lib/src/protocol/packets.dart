@@ -1,20 +1,23 @@
 const String svgAppClientType = 'Svg-App';
-const String targetServerVersion = '0.1.3';
+const String targetServerVersion = '0.1.4';
+const String baselineTargetServerVersion = '0.1.3';
+const List<String> supportedTargetServerVersions = [
+  targetServerVersion,
+  baselineTargetServerVersion,
+];
 const String legacyAudioMode = 'legacy';
 const String svgV2AudioMode = 'svg-v2';
 
 Map<String, Object?> joinPacket({
   required String username,
   required String password,
+  String serverVersion = targetServerVersion,
 }) {
   return {
     'type': 'join',
     'username': username.trim(),
     'password': password,
-    'clientType': {
-      'type': svgAppClientType,
-      'serverVersion': targetServerVersion,
-    },
+    'clientType': {'type': svgAppClientType, 'serverVersion': serverVersion},
   };
 }
 
