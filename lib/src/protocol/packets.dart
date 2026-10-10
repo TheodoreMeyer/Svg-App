@@ -1,8 +1,9 @@
 const String svgAppClientType = 'Svg-App';
-const String targetServerVersion = '0.1.4';
+const String targetServerVersion = '0.1.5';
 const String baselineTargetServerVersion = '0.1.3';
 const List<String> supportedTargetServerVersions = [
   targetServerVersion,
+  '0.1.4',
   baselineTargetServerVersion,
 ];
 const String legacyAudioMode = 'legacy';
@@ -49,6 +50,11 @@ String controlPacketMessage(Map<String, Object?> packet) {
 bool isConnectedStatusPacket(Map<String, Object?> packet) {
   return controlPacketType(packet) == 'status' &&
       controlPacketMessage(packet).toLowerCase().contains('connected as');
+}
+
+bool isTransferStatusPacket(Map<String, Object?> packet) {
+  return controlPacketType(packet) == 'status' &&
+      controlPacketMessage(packet).trim() == 'Changing server';
 }
 
 Map<String, Object?> chatPacket(String message) {

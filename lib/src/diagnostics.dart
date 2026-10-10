@@ -2,6 +2,7 @@ enum AppConnectionState {
   idle,
   connecting,
   authenticated,
+  transferring,
   connected,
   degraded,
   fatalError,
@@ -98,12 +99,10 @@ class DiagnosticsSnapshot {
       unsupportedOpusFrames:
           unsupportedOpusFrames ?? this.unsupportedOpusFrames,
       micPacketsSent: micPacketsSent ?? this.micPacketsSent,
-      micPermissionGranted:
-          micPermissionGranted ?? this.micPermissionGranted,
+      micPermissionGranted: micPermissionGranted ?? this.micPermissionGranted,
       micRunning: micRunning ?? this.micRunning,
       playbackRunning: playbackRunning ?? this.playbackRunning,
-      speakerphoneEnabled:
-          speakerphoneEnabled ?? this.speakerphoneEnabled,
+      speakerphoneEnabled: speakerphoneEnabled ?? this.speakerphoneEnabled,
       audioRoute: audioRoute ?? this.audioRoute,
       audioDebugInfo: audioDebugInfo ?? this.audioDebugInfo,
       lastReceivedPcmChannels:

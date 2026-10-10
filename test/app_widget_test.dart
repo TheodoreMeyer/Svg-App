@@ -9,7 +9,9 @@ import 'package:simple_voice_app/src/notification/call_notification_bridge.dart'
 import 'package:simple_voice_app/src/protocol/simple_voice_client.dart';
 
 void main() {
-  testWidgets('join screen shows server and credential controls', (tester) async {
+  testWidgets('join screen shows server and credential controls', (
+    tester,
+  ) async {
     await tester.pumpWidget(const SimpleVoiceApp(showOpeningSplash: false));
 
     expect(find.text('Simple Voice App'), findsOneWidget);
@@ -41,12 +43,16 @@ void main() {
     expect(find.byTooltip('Hide password'), findsOneWidget);
   });
 
-  testWidgets('joined shell switches between voice and chat tabs', (tester) async {
-    await tester.pumpWidget(SimpleVoiceApp(
-      initiallyConnected: true,
-      audioBridge: _FakeAudioBridge(),
-      showOpeningSplash: false,
-    ));
+  testWidgets('joined shell switches between voice and chat tabs', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      SimpleVoiceApp(
+        initiallyConnected: true,
+        audioBridge: _FakeAudioBridge(),
+        showOpeningSplash: false,
+      ),
+    );
 
     expect(find.text('Voice'), findsWidgets);
     expect(find.text('Microphone'), findsOneWidget);
@@ -58,11 +64,13 @@ void main() {
   });
 
   testWidgets('ptt overlay changes state while pressed', (tester) async {
-    await tester.pumpWidget(SimpleVoiceApp(
-      initiallyConnected: true,
-      audioBridge: _FakeAudioBridge(),
-      showOpeningSplash: false,
-    ));
+    await tester.pumpWidget(
+      SimpleVoiceApp(
+        initiallyConnected: true,
+        audioBridge: _FakeAudioBridge(),
+        showOpeningSplash: false,
+      ),
+    );
 
     expect(
       tester
@@ -102,13 +110,16 @@ void main() {
     );
   });
 
-  testWidgets('ptt overlay restores push to talk mode after closing',
-      (tester) async {
-    await tester.pumpWidget(SimpleVoiceApp(
-      initiallyConnected: true,
-      audioBridge: _FakeAudioBridge(),
-      showOpeningSplash: false,
-    ));
+  testWidgets('ptt overlay restores push to talk mode after closing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      SimpleVoiceApp(
+        initiallyConnected: true,
+        audioBridge: _FakeAudioBridge(),
+        showOpeningSplash: false,
+      ),
+    );
 
     await tester.tap(find.byKey(const Key('openMicSwitch')));
     await tester.pumpAndSettle();
@@ -137,11 +148,13 @@ void main() {
     final audio = _FakeAudioBridge(
       audioDebugInfo: 'Audio Devtools\nNative audio mode: normal',
     );
-    await tester.pumpWidget(SimpleVoiceApp(
-      initiallyConnected: true,
-      audioBridge: audio,
-      showOpeningSplash: false,
-    ));
+    await tester.pumpWidget(
+      SimpleVoiceApp(
+        initiallyConnected: true,
+        audioBridge: audio,
+        showOpeningSplash: false,
+      ),
+    );
 
     await tester.tap(find.byKey(const Key('diagnosticsButton')));
     await tester.pumpAndSettle();
@@ -154,15 +167,19 @@ void main() {
     expect(find.textContaining('Build'), findsNothing);
   });
 
-  testWidgets('invalid server url shows user-facing connection error',
-      (tester) async {
+  testWidgets('invalid server url shows user-facing connection error', (
+    tester,
+  ) async {
     await tester.pumpWidget(const SimpleVoiceApp(showOpeningSplash: false));
 
     await tester.enterText(
       find.byKey(const Key('serverUrlField')),
       'ftp://host',
     );
-    await tester.enterText(find.byKey(const Key('usernameField')), 'PlayerName');
+    await tester.enterText(
+      find.byKey(const Key('usernameField')),
+      'PlayerName',
+    );
     await tester.enterText(find.byKey(const Key('passwordField')), 'secret');
     final joinButton = find.byKey(const Key('joinButton'));
     await tester.ensureVisible(joinButton);
@@ -173,8 +190,9 @@ void main() {
     expect(find.text('Use an http or https server address.'), findsOneWidget);
   });
 
-  testWidgets('minecraft port warning appears below server field and clears',
-      (tester) async {
+  testWidgets('minecraft port warning appears below server field and clears', (
+    tester,
+  ) async {
     await tester.pumpWidget(const SimpleVoiceApp(showOpeningSplash: false));
 
     await tester.enterText(
@@ -201,8 +219,9 @@ void main() {
     expect(find.byKey(const Key('minecraftPortWarning')), findsNothing);
   });
 
-  testWidgets('minecraft port join is blocked without snackbar',
-      (tester) async {
+  testWidgets('minecraft port join is blocked without snackbar', (
+    tester,
+  ) async {
     await tester.pumpWidget(const SimpleVoiceApp(showOpeningSplash: false));
 
     await tester.enterText(
@@ -222,8 +241,9 @@ void main() {
     );
   });
 
-  testWidgets('empty join fields show inline validation errors',
-      (tester) async {
+  testWidgets('empty join fields show inline validation errors', (
+    tester,
+  ) async {
     await tester.pumpWidget(const SimpleVoiceApp(showOpeningSplash: false));
 
     final joinButton = find.byKey(const Key('joinButton'));
@@ -242,8 +262,9 @@ void main() {
     expect(find.text('fatalError'), findsNothing);
   });
 
-  testWidgets('empty join field validates on blur and clears while typing',
-      (tester) async {
+  testWidgets('empty join field validates on blur and clears while typing', (
+    tester,
+  ) async {
     await tester.pumpWidget(const SimpleVoiceApp(showOpeningSplash: false));
 
     await tester.tap(find.byKey(const Key('serverUrlField')));
@@ -262,8 +283,9 @@ void main() {
     expect(find.text('Please provide a valid server address'), findsNothing);
   });
 
-  testWidgets('connected status opens joined shell and sends capabilities',
-      (tester) async {
+  testWidgets('connected status opens joined shell and sends capabilities', (
+    tester,
+  ) async {
     final audio = _FakeAudioBridge();
     final notification = _FakeCallNotificationBridge();
     final client = _FakeSimpleVoiceClient(
@@ -272,18 +294,23 @@ void main() {
         'message': 'Connected as PlayerName.',
       },
     );
-    await tester.pumpWidget(SimpleVoiceApp(
-      audioBridge: audio,
-      notificationBridge: notification,
-      clientFactory: (_) => client,
-      showOpeningSplash: false,
-    ));
+    await tester.pumpWidget(
+      SimpleVoiceApp(
+        audioBridge: audio,
+        notificationBridge: notification,
+        clientFactory: (_) => client,
+        showOpeningSplash: false,
+      ),
+    );
 
     await tester.enterText(
       find.byKey(const Key('serverUrlField')),
       'http://192.168.1.64:24455',
     );
-    await tester.enterText(find.byKey(const Key('usernameField')), 'PlayerName');
+    await tester.enterText(
+      find.byKey(const Key('usernameField')),
+      'PlayerName',
+    );
     await tester.enterText(find.byKey(const Key('passwordField')), 'secret');
     await _tapVisible(tester, find.byKey(const Key('joinButton')));
 
@@ -300,28 +327,31 @@ void main() {
     expect(client.micPackets, hasLength(1));
   });
 
-  testWidgets('notification actions control call state and chat',
-      (tester) async {
+  testWidgets('notification actions control call state and chat', (
+    tester,
+  ) async {
     final audio = _FakeAudioBridge();
     final notification = _FakeCallNotificationBridge();
     final client = _FakeSimpleVoiceClient(
-      controlPacket: {
-        'type': 'status',
-        'message': 'Connected as PlayerName.',
-      },
+      controlPacket: {'type': 'status', 'message': 'Connected as PlayerName.'},
     );
-    await tester.pumpWidget(SimpleVoiceApp(
-      audioBridge: audio,
-      notificationBridge: notification,
-      clientFactory: (_) => client,
-      showOpeningSplash: false,
-    ));
+    await tester.pumpWidget(
+      SimpleVoiceApp(
+        audioBridge: audio,
+        notificationBridge: notification,
+        clientFactory: (_) => client,
+        showOpeningSplash: false,
+      ),
+    );
 
     await tester.enterText(
       find.byKey(const Key('serverUrlField')),
       'http://192.168.1.64:24455',
     );
-    await tester.enterText(find.byKey(const Key('usernameField')), 'PlayerName');
+    await tester.enterText(
+      find.byKey(const Key('usernameField')),
+      'PlayerName',
+    );
     await tester.enterText(find.byKey(const Key('passwordField')), 'secret');
     await _tapVisible(tester, find.byKey(const Key('joinButton')));
 
@@ -335,7 +365,9 @@ void main() {
     expect(audio.speakerphoneCalls, contains(true));
     expect(notification.updates.last['speaker'], isTrue);
 
-    notification.emit(const CallNotificationAction('reply', message: ' hello '));
+    notification.emit(
+      const CallNotificationAction('reply', message: ' hello '),
+    );
     await tester.pumpAndSettle();
     expect(client.chatMessages, ['hello']);
     expect(notification.updates.last['transientStatus'], 'Message sent');
@@ -353,28 +385,31 @@ void main() {
     expect(notification.stops, greaterThan(0));
   });
 
-  testWidgets('notification unmute sends while app mode is push to talk',
-      (tester) async {
+  testWidgets('notification unmute sends while app mode is push to talk', (
+    tester,
+  ) async {
     final audio = _FakeAudioBridge();
     final notification = _FakeCallNotificationBridge();
     final client = _FakeSimpleVoiceClient(
-      controlPacket: {
-        'type': 'status',
-        'message': 'Connected as PlayerName.',
-      },
+      controlPacket: {'type': 'status', 'message': 'Connected as PlayerName.'},
     );
-    await tester.pumpWidget(SimpleVoiceApp(
-      audioBridge: audio,
-      notificationBridge: notification,
-      clientFactory: (_) => client,
-      showOpeningSplash: false,
-    ));
+    await tester.pumpWidget(
+      SimpleVoiceApp(
+        audioBridge: audio,
+        notificationBridge: notification,
+        clientFactory: (_) => client,
+        showOpeningSplash: false,
+      ),
+    );
 
     await tester.enterText(
       find.byKey(const Key('serverUrlField')),
       'http://192.168.1.64:24455',
     );
-    await tester.enterText(find.byKey(const Key('usernameField')), 'PlayerName');
+    await tester.enterText(
+      find.byKey(const Key('usernameField')),
+      'PlayerName',
+    );
     await tester.enterText(find.byKey(const Key('passwordField')), 'secret');
     await _tapVisible(tester, find.byKey(const Key('joinButton')));
 
@@ -402,23 +437,25 @@ void main() {
     final audio = _FakeAudioBridge();
     final notification = _FakeCallNotificationBridge();
     final client = _FakeSimpleVoiceClient(
-      controlPacket: {
-        'type': 'status',
-        'message': 'Connected as PlayerName.',
-      },
+      controlPacket: {'type': 'status', 'message': 'Connected as PlayerName.'},
     );
-    await tester.pumpWidget(SimpleVoiceApp(
-      audioBridge: audio,
-      notificationBridge: notification,
-      clientFactory: (_) => client,
-      showOpeningSplash: false,
-    ));
+    await tester.pumpWidget(
+      SimpleVoiceApp(
+        audioBridge: audio,
+        notificationBridge: notification,
+        clientFactory: (_) => client,
+        showOpeningSplash: false,
+      ),
+    );
 
     await tester.enterText(
       find.byKey(const Key('serverUrlField')),
       'http://192.168.1.64:24455',
     );
-    await tester.enterText(find.byKey(const Key('usernameField')), 'PlayerName');
+    await tester.enterText(
+      find.byKey(const Key('usernameField')),
+      'PlayerName',
+    );
     await tester.enterText(find.byKey(const Key('passwordField')), 'secret');
     await _tapVisible(tester, find.byKey(const Key('joinButton')));
 
@@ -451,20 +488,26 @@ void main() {
     expect(audio.state.micRunning, isFalse);
   });
 
-  testWidgets('join confirmation timeout returns to join screen',
-      (tester) async {
+  testWidgets('join confirmation timeout returns to join screen', (
+    tester,
+  ) async {
     final client = _FakeSimpleVoiceClient();
-    await tester.pumpWidget(SimpleVoiceApp(
-      audioBridge: _FakeAudioBridge(),
-      clientFactory: (_) => client,
-      showOpeningSplash: false,
-    ));
+    await tester.pumpWidget(
+      SimpleVoiceApp(
+        audioBridge: _FakeAudioBridge(),
+        clientFactory: (_) => client,
+        showOpeningSplash: false,
+      ),
+    );
 
     await tester.enterText(
       find.byKey(const Key('serverUrlField')),
       'http://192.168.1.64:24455',
     );
-    await tester.enterText(find.byKey(const Key('usernameField')), 'PlayerName');
+    await tester.enterText(
+      find.byKey(const Key('usernameField')),
+      'PlayerName',
+    );
     await tester.enterText(find.byKey(const Key('passwordField')), 'secret');
     final joinButton = find.byKey(const Key('joinButton'));
     await tester.ensureVisible(joinButton);
@@ -494,17 +537,22 @@ void main() {
         'message': 'Authentication failed: bad password.',
       },
     );
-    await tester.pumpWidget(SimpleVoiceApp(
-      audioBridge: _FakeAudioBridge(),
-      clientFactory: (_) => client,
-      showOpeningSplash: false,
-    ));
+    await tester.pumpWidget(
+      SimpleVoiceApp(
+        audioBridge: _FakeAudioBridge(),
+        clientFactory: (_) => client,
+        showOpeningSplash: false,
+      ),
+    );
 
     await tester.enterText(
       find.byKey(const Key('serverUrlField')),
       'http://192.168.1.64:24455',
     );
-    await tester.enterText(find.byKey(const Key('usernameField')), 'PlayerName');
+    await tester.enterText(
+      find.byKey(const Key('usernameField')),
+      'PlayerName',
+    );
     await tester.enterText(find.byKey(const Key('passwordField')), 'wrong');
     final joinButton = find.byKey(const Key('joinButton'));
     await tester.ensureVisible(joinButton);
@@ -522,13 +570,17 @@ void main() {
     );
   });
 
-  testWidgets('speaker icon updates audio route from voice tab', (tester) async {
+  testWidgets('speaker icon updates audio route from voice tab', (
+    tester,
+  ) async {
     final audio = _FakeAudioBridge();
-    await tester.pumpWidget(SimpleVoiceApp(
-      initiallyConnected: true,
-      audioBridge: audio,
-      showOpeningSplash: false,
-    ));
+    await tester.pumpWidget(
+      SimpleVoiceApp(
+        initiallyConnected: true,
+        audioBridge: audio,
+        showOpeningSplash: false,
+      ),
+    );
 
     final speakerButton = find.byKey(const Key('voiceSpeakerToggleButton'));
     expect(speakerButton, findsOneWidget);
@@ -546,10 +598,7 @@ void main() {
     expect(tester.widget<IconButton>(speakerButton).isSelected, isTrue);
 
     await tester.tap(find.byTooltip('Leave'));
-    await _pumpUntil(
-      tester,
-      () => audio.state.speakerphoneEnabled == false,
-    );
+    await _pumpUntil(tester, () => audio.state.speakerphoneEnabled == false);
 
     expect(audio.state.speakerphoneEnabled, isFalse);
     expect(audio.state.audioRoute, 'normal');
@@ -557,10 +606,9 @@ void main() {
 
   testWidgets('speaker icon is available with test audio', (tester) async {
     final audio = _FakeAudioBridge();
-    await tester.pumpWidget(SimpleVoiceApp(
-      audioBridge: audio,
-      showOpeningSplash: false,
-    ));
+    await tester.pumpWidget(
+      SimpleVoiceApp(audioBridge: audio, showOpeningSplash: false),
+    );
 
     final speakerButton = find.byKey(const Key('joinSpeakerToggleButton'));
     expect(speakerButton, findsOneWidget);
@@ -571,13 +619,13 @@ void main() {
     expect(tester.widget<IconButton>(speakerButton).isSelected, isTrue);
   });
 
-  testWidgets('test audio starts local mic monitor and stops cleanly',
-      (tester) async {
+  testWidgets('test audio starts local mic monitor and stops cleanly', (
+    tester,
+  ) async {
     final audio = _FakeAudioBridge();
-    await tester.pumpWidget(SimpleVoiceApp(
-      audioBridge: audio,
-      showOpeningSplash: false,
-    ));
+    await tester.pumpWidget(
+      SimpleVoiceApp(audioBridge: audio, showOpeningSplash: false),
+    );
 
     await _tapVisible(tester, find.byKey(const Key('testAudioButton')));
 
@@ -604,12 +652,13 @@ void main() {
     expect(audio.state.playbackRunning, isFalse);
   });
 
-  testWidgets('denied mic permission shows human audio message', (tester) async {
+  testWidgets('denied mic permission shows human audio message', (
+    tester,
+  ) async {
     final audio = _FakeAudioBridge(permissionGranted: false);
-    await tester.pumpWidget(SimpleVoiceApp(
-      audioBridge: audio,
-      showOpeningSplash: false,
-    ));
+    await tester.pumpWidget(
+      SimpleVoiceApp(audioBridge: audio, showOpeningSplash: false),
+    );
 
     await _tapVisible(tester, find.byKey(const Key('testAudioButton')));
 
@@ -623,6 +672,57 @@ void main() {
       findsWidgets,
     );
     expect(audio.state.micPermissionGranted, isFalse);
+  });
+
+  testWidgets('transfer retains draft and controls without restarting the call', (tester) async {
+    final audio = _FakeAudioBridge();
+    final notification = _FakeCallNotificationBridge();
+    final client = _FakeSimpleVoiceClient(controlPacket: {'type':'status', 'message':'Connected as PlayerName.'});
+    await tester.pumpWidget(SimpleVoiceApp(audioBridge:audio, notificationBridge:notification,
+        clientFactory: (_) => client, showOpeningSplash:false));
+    await tester.enterText(find.byKey(const Key('serverUrlField')), 'http://192.168.1.64:24455');
+    await tester.enterText(find.byKey(const Key('usernameField')), 'PlayerName');
+    await tester.enterText(find.byKey(const Key('passwordField')), 'secret');
+    await _tapVisible(tester, find.byKey(const Key('joinButton')));
+    await tester.tap(find.text('Chat'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('chatInput')), 'draft');
+    client.packetHandler!({'type':'status', 'message':'Changing server'});
+    await tester.pumpAndSettle();
+    audio.emit(Uint8List(1920));
+    notification.emit(const CallNotificationAction('reply', message:'blocked'));
+    await tester.pumpAndSettle();
+    expect(client.micPackets, isEmpty);
+    expect(client.chatMessages, isEmpty);
+    expect(tester.widget<TextField>(find.byKey(const Key('chatInput'))).controller!.text, 'draft');
+    client.packetHandler!({'type':'status', 'message':'Connected as PlayerName.'});
+    client.packetHandler!({'type':'status', 'message':'Connected as PlayerName.'});
+    await tester.pumpAndSettle();
+    audio.emit(Uint8List(1920));
+    await tester.pump();
+    expect(client.micPackets.length, 1);
+    expect(client.capabilitiesSent, 1);
+    expect(notification.starts.length, 1);
+    expect(audio.micStarts, 1);
+    expect(audio.playbackStarts, 1);
+  });
+
+  testWidgets('authentication deadline resets for a fallback attempt', (tester) async {
+    final client = _FakeSimpleVoiceClient();
+    await tester.pumpWidget(SimpleVoiceApp(clientFactory: (_) => client, showOpeningSplash:false));
+    await tester.enterText(find.byKey(const Key('serverUrlField')), 'http://192.168.1.64:24455');
+    await tester.enterText(find.byKey(const Key('usernameField')), 'PlayerName');
+    await tester.enterText(find.byKey(const Key('passwordField')), 'secret');
+    await _tapVisible(tester, find.byKey(const Key('joinButton')));
+    await tester.pump(const Duration(seconds:7));
+    client.attemptHandler!();
+    await tester.pump(const Duration(seconds:7));
+    expect(client.disconnected, false);
+    await tester.pump(const Duration(seconds:2));
+    expect(client.disconnected, true);
+    client.packetHandler!({'type':'status', 'message':'Connected as PlayerName.'});
+    await tester.pump();
+    expect(find.byKey(const Key('joinButton')), findsOneWidget);
   });
 
   testWidgets('opening splash appears before join screen', (tester) async {
@@ -639,9 +739,11 @@ void main() {
 
 class _FakeSimpleVoiceClient extends SimpleVoiceClient {
   _FakeSimpleVoiceClient({this.controlPacket})
-      : super(Uri.parse('ws://voice.example.com/ws'));
+    : super(Uri.parse('ws://voice.example.com/ws'));
 
   final Map<String, Object?>? controlPacket;
+  void Function(Map<String, Object?>)? packetHandler;
+  void Function()? attemptHandler;
   var capabilitiesSent = 0;
   var disconnected = false;
   final micPackets = <Uint8List>[];
@@ -654,7 +756,11 @@ class _FakeSimpleVoiceClient extends SimpleVoiceClient {
     required void Function(Map<String, Object?> packet) onControlPacket,
     required void Function(Uint8List bytes) onAudioFrame,
     required void Function(int? code, String reason) onClosed,
+    void Function()? onJoinAttempt,
   }) async {
+    packetHandler = onControlPacket;
+    attemptHandler = onJoinAttempt;
+    onJoinAttempt?.call();
     final packet = controlPacket;
     if (packet != null) {
       onControlPacket(packet);
@@ -710,13 +816,15 @@ class _FakeCallNotificationBridge implements CallNotificationBridge {
     required bool speaker,
     String transientStatus = '',
   }) async {
-    starts.add(_payload(
-      server: server,
-      status: status,
-      muted: muted,
-      speaker: speaker,
-      transientStatus: transientStatus,
-    ));
+    starts.add(
+      _payload(
+        server: server,
+        status: status,
+        muted: muted,
+        speaker: speaker,
+        transientStatus: transientStatus,
+      ),
+    );
   }
 
   @override
@@ -727,13 +835,15 @@ class _FakeCallNotificationBridge implements CallNotificationBridge {
     required bool speaker,
     String transientStatus = '',
   }) async {
-    updates.add(_payload(
-      server: server,
-      status: status,
-      muted: muted,
-      speaker: speaker,
-      transientStatus: transientStatus,
-    ));
+    updates.add(
+      _payload(
+        server: server,
+        status: status,
+        muted: muted,
+        speaker: speaker,
+        transientStatus: transientStatus,
+      ),
+    );
   }
 
   @override
@@ -780,15 +890,15 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 }
 
 class _FakeAudioBridge implements AudioBridge {
-  _FakeAudioBridge({
-    this.permissionGranted = true,
-    String audioDebugInfo = '',
-  }) : _state = AudioBridgeState(audioDebugInfo: audioDebugInfo);
+  _FakeAudioBridge({this.permissionGranted = true, String audioDebugInfo = ''})
+    : _state = AudioBridgeState(audioDebugInfo: audioDebugInfo);
 
   final bool permissionGranted;
   final _controller = StreamController<Uint8List>.broadcast();
   AudioBridgeState _state;
   var playedPackets = 0;
+  var micStarts = 0;
+  var playbackStarts = 0;
   final speakerphoneCalls = <bool>[];
 
   void emit(Uint8List packet) => _controller.add(packet);
@@ -839,12 +949,14 @@ class _FakeAudioBridge implements AudioBridge {
 
   @override
   Future<bool> startMic() async {
+    micStarts++;
     _state = _state.copyWith(micRunning: permissionGranted);
     return permissionGranted;
   }
 
   @override
   Future<bool> startPlayback() async {
+    playbackStarts++;
     _state = _state.copyWith(playbackRunning: true);
     return true;
   }

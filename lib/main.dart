@@ -54,9 +54,7 @@ class SimpleVoiceApp extends StatelessWidget {
       title: 'Simple Voice App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF55C055),
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF55C055)),
         scaffoldBackgroundColor: const Color(0xFFF7F8F3),
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(),
@@ -88,10 +86,7 @@ class SimpleVoiceApp extends StatelessWidget {
 }
 
 class _OpeningGate extends StatefulWidget {
-  const _OpeningGate({
-    required this.showOpeningSplash,
-    required this.child,
-  });
+  const _OpeningGate({required this.showOpeningSplash, required this.child});
 
   final bool showOpeningSplash;
   final Widget child;
@@ -146,18 +141,12 @@ class _OpeningSplashState extends State<_OpeningSplash>
     _iconOffset = Tween<Offset>(
       begin: const Offset(0, 0.55),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _startTimer = Timer(
       const Duration(milliseconds: 200),
       () => _controller.forward(),
     );
-    _finishTimer = Timer(
-      const Duration(milliseconds: 2000),
-      widget.onFinished,
-    );
+    _finishTimer = Timer(const Duration(milliseconds: 2000), widget.onFinished);
   }
 
   @override
@@ -181,9 +170,9 @@ class _OpeningSplashState extends State<_OpeningSplash>
                 'Simple Voice App',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: const Color(0xFF1A2413),
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: const Color(0xFF1A2413),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             Align(
@@ -229,6 +218,9 @@ class _HomeScreenState extends State<_HomeScreen> {
   bool _muted = false;
   bool _openMic = true;
   bool _pttActive = false;
+  bool _transferring = false;
+  int _connectionGeneration = 0;
+  final _pttAvailable = ValueNotifier<bool>(true);
   bool _notificationOpenMicOverride = false;
   bool _localAudioTest = false;
   bool _localAudioActive = false;
@@ -280,9 +272,7 @@ class _HomeScreenState extends State<_HomeScreen> {
       _handleNotificationAction,
       onError: (_) {},
     );
-    _serverFocusNode.addListener(
-      () => _validateFieldOnBlur(_JoinField.server),
-    );
+    _serverFocusNode.addListener(() => _validateFieldOnBlur(_JoinField.server));
     _usernameFocusNode.addListener(
       () => _validateFieldOnBlur(_JoinField.username),
     );
@@ -294,6 +284,8 @@ class _HomeScreenState extends State<_HomeScreen> {
 
   @override
   void dispose() {
+    ++_connectionGeneration;
+    _pttAvailable.dispose();
     _joinConfirmationTimer?.cancel();
     _notificationTransientTimer?.cancel();
     _serverController.dispose();
@@ -441,10 +433,7 @@ class _HomeScreenState extends State<_HomeScreen> {
       duration: const Duration(milliseconds: 180),
       builder: (context, value, child) {
         final offset = math.sin(value * math.pi * 4) * 4;
-        return Transform.translate(
-          offset: Offset(offset, 0),
-          child: child,
-        );
+        return Transform.translate(offset: Offset(offset, 0), child: child);
       },
       child: child,
     );
@@ -469,9 +458,9 @@ class _HomeScreenState extends State<_HomeScreen> {
               'Simple Voice App',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: const Color(0xFF1A2413),
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: const Color(0xFF1A2413),
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 28),
             _shakingField(
@@ -485,8 +474,7 @@ class _HomeScreenState extends State<_HomeScreen> {
                 decoration: InputDecoration(
                   labelText: 'Server',
                   hintText: 'voice.example.com',
-                  errorText:
-                      _serverFieldError ? _serverRequiredMessage : null,
+                  errorText: _serverFieldError ? _serverRequiredMessage : null,
                 ),
                 keyboardType: TextInputType.url,
               ),
@@ -523,13 +511,12 @@ class _HomeScreenState extends State<_HomeScreen> {
                 key: Key('usernameField'),
                 controller: _usernameController,
                 focusNode: _usernameFocusNode,
-                onChanged: (_) => _clearRequiredFieldError(
-                  _JoinField.username,
-                ),
+                onChanged: (_) => _clearRequiredFieldError(_JoinField.username),
                 decoration: InputDecoration(
                   labelText: 'Username',
-                  errorText:
-                      _usernameFieldError ? _usernameRequiredMessage : null,
+                  errorText: _usernameFieldError
+                      ? _usernameRequiredMessage
+                      : null,
                 ),
               ),
             ),
@@ -541,17 +528,17 @@ class _HomeScreenState extends State<_HomeScreen> {
                 key: Key('passwordField'),
                 controller: _passwordController,
                 focusNode: _passwordFocusNode,
-                onChanged: (_) => _clearRequiredFieldError(
-                  _JoinField.password,
-                ),
+                onChanged: (_) => _clearRequiredFieldError(_JoinField.password),
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  errorText:
-                      _passwordFieldError ? _passwordRequiredMessage : null,
+                  errorText: _passwordFieldError
+                      ? _passwordRequiredMessage
+                      : null,
                   suffixIcon: IconButton(
                     key: const Key('passwordVisibilityButton'),
-                    tooltip:
-                        _passwordVisible ? 'Hide password' : 'Show password',
+                    tooltip: _passwordVisible
+                        ? 'Hide password'
+                        : 'Show password',
                     onPressed: () {
                       setState(() => _passwordVisible = !_passwordVisible);
                     },
@@ -597,9 +584,7 @@ class _HomeScreenState extends State<_HomeScreen> {
             ),
             if (_localAudioTest) ...[
               const SizedBox(height: 8),
-              _StatusLine(
-                text: _localAudioStatusText(),
-              ),
+              _StatusLine(text: _localAudioStatusText()),
             ],
           ],
         ),
@@ -662,9 +647,7 @@ class _HomeScreenState extends State<_HomeScreen> {
         Text('Username ${_displayUsername()}'),
         const SizedBox(height: 8),
         Text('Microphone: ${_micStatusText()}'),
-        Text(
-          'Playback: ${_playbackStatusText()} | ${_audioRouteText()}',
-        ),
+        Text('Playback: ${_playbackStatusText()} | ${_audioRouteText()}'),
         if (_diagnostics.audioError.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
@@ -731,7 +714,9 @@ class _HomeScreenState extends State<_HomeScreen> {
                 child: TextField(
                   key: const Key('chatInput'),
                   controller: _chatController,
-                  decoration: const InputDecoration(hintText: 'Write a message'),
+                  decoration: const InputDecoration(
+                    hintText: 'Write a message',
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -744,6 +729,7 @@ class _HomeScreenState extends State<_HomeScreen> {
   }
 
   void _showPtt() {
+    if (!_connected || _transferring) return;
     final previousOpenMic = _openMic;
     final previousMuted = _muted;
     setState(() {
@@ -758,9 +744,10 @@ class _HomeScreenState extends State<_HomeScreen> {
       context: context,
       barrierDismissible: true,
       builder: (context) => _PushToTalkOverlay(
+        available: _pttAvailable,
         onTalkingChanged: (talking) {
           if (!mounted) return;
-          setState(() => _pttActive = talking);
+          setState(() => _pttActive = talking && !_transferring && _connected);
         },
       ),
     ).whenComplete(() {
@@ -792,6 +779,7 @@ class _HomeScreenState extends State<_HomeScreen> {
   }
 
   Future<void> _connect() async {
+    final generation = ++_connectionGeneration;
     final server = _serverController.text.trim();
     final username = _usernameController.text.trim();
     final password = _passwordController.text;
@@ -815,12 +803,15 @@ class _HomeScreenState extends State<_HomeScreen> {
 
     try {
       final websocketUri = await websocketUriForServerWithDiscovery(server);
+      if (!mounted || generation != _connectionGeneration) return;
       websocketText = websocketUri.toString();
-      unawaited(_saveCredentials(
-        serverUrl: server,
-        username: username,
-        password: password,
-      ));
+      unawaited(
+        _saveCredentials(
+          serverUrl: server,
+          username: username,
+          password: password,
+        ),
+      );
 
       final client = widget.clientFactory == null
           ? SimpleVoiceClient(websocketUri)
@@ -839,12 +830,25 @@ class _HomeScreenState extends State<_HomeScreen> {
       await client.connect(
         username: username,
         password: password,
-        onControlPacket: _handleControlPacket,
-        onAudioFrame: (bytes) => unawaited(_handleAudioFrame(bytes)),
-        onClosed: _handleClosed,
+        onJoinAttempt: () {
+          if (mounted && generation == _connectionGeneration) {
+            _startJoinConfirmationTimer();
+          }
+        },
+        onControlPacket: (packet) {
+          if (generation == _connectionGeneration) _handleControlPacket(packet);
+        },
+        onAudioFrame: (bytes) {
+          if (generation == _connectionGeneration) {
+            unawaited(_handleAudioFrame(bytes));
+          }
+        },
+        onClosed: (code, reason) {
+          if (generation == _connectionGeneration) _handleClosed(code, reason);
+        },
       );
-      if (_busy && !_connected) _startJoinConfirmationTimer();
     } catch (error) {
+      if (!mounted || generation != _connectionGeneration) return;
       _joinConfirmationTimer?.cancel();
       final message = _humanReadableConnectionError(error);
       if (!mounted) return;
@@ -872,10 +876,19 @@ class _HomeScreenState extends State<_HomeScreen> {
       if (isConnectedStatusPacket(packet)) {
         _joinConfirmationTimer?.cancel();
         _busy = false;
+        becameConnected = !_connected;
         _connected = true;
-        becameConnected = true;
+        _transferring = false;
+        _pttAvailable.value = true;
         _diagnostics = _diagnostics.copyWith(
           state: AppConnectionState.connected,
+        );
+      } else if (_connected && isTransferStatusPacket(packet)) {
+        _transferring = true;
+        _pttActive = false;
+        _pttAvailable.value = false;
+        _diagnostics = _diagnostics.copyWith(
+          state: AppConnectionState.transferring,
         );
       } else if (type == 'error') {
         _joinConfirmationTimer?.cancel();
@@ -898,6 +911,8 @@ class _HomeScreenState extends State<_HomeScreen> {
     if (becameConnected) {
       _client?.sendCapabilities();
       unawaited(_startConnectedAudio());
+    } else if (_connected) {
+      unawaited(_updateCallNotification());
     }
   }
 
@@ -915,6 +930,9 @@ class _HomeScreenState extends State<_HomeScreen> {
 
   void _handleClosed(int? code, String reason) {
     if (!mounted) return;
+    ++_connectionGeneration;
+    _transferring = false;
+    _pttAvailable.value = false;
     _joinConfirmationTimer?.cancel();
     _notificationTransientTimer?.cancel();
     unawaited(_notification.stop());
@@ -938,16 +956,11 @@ class _HomeScreenState extends State<_HomeScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 5),
-        ),
+        SnackBar(content: Text(message), duration: const Duration(seconds: 5)),
       );
   }
 
-  Future<void> _handleNotificationAction(
-    CallNotificationAction action,
-  ) async {
+  Future<void> _handleNotificationAction(CallNotificationAction action) async {
     switch (action.type) {
       case 'mute':
         await _setMicEnabled(false);
@@ -979,6 +992,7 @@ class _HomeScreenState extends State<_HomeScreen> {
     _joinConfirmationTimer?.cancel();
     _joinConfirmationTimer = Timer(_joinConfirmationTimeout, () {
       if (!mounted || !_busy || _connected) return;
+      ++_connectionGeneration;
       unawaited(_client?.disconnect());
       setState(() {
         _busy = false;
@@ -1073,17 +1087,20 @@ class _HomeScreenState extends State<_HomeScreen> {
   bool _sendChatMessage(String rawMessage) {
     final message = rawMessage.trim();
     if (message.isEmpty) return false;
-    if (!_connected) return false;
+    if (!_connected || _transferring) return false;
     _client?.sendChat(message);
     setState(() {
-      _diagnostics = _diagnostics.copyWith(
-        chatSent: _diagnostics.chatSent + 1,
-      );
+      _diagnostics = _diagnostics.copyWith(chatSent: _diagnostics.chatSent + 1);
     });
     return true;
   }
 
   Future<void> _disconnect() async {
+    ++_connectionGeneration;
+    _connected = false;
+    _busy = false;
+    _transferring = false;
+    _pttAvailable.value = false;
     _joinConfirmationTimer?.cancel();
     _flushMicPacketDiagnostics();
     _notificationTransientTimer?.cancel();
@@ -1099,24 +1116,30 @@ class _HomeScreenState extends State<_HomeScreen> {
       _notificationOpenMicOverride = false;
       _localAudioTest = false;
       _localAudioActive = false;
-      _diagnostics = _withAudioState(_diagnostics).copyWith(
-        state: AppConnectionState.disconnected,
-      );
+      _diagnostics = _withAudioState(
+        _diagnostics,
+      ).copyWith(state: AppConnectionState.disconnected);
     });
   }
 
   Future<void> _startConnectedAudio() async {
+    final generation = _connectionGeneration;
     await _subscribeMicPackets();
+    if (!mounted || generation != _connectionGeneration || !_connected) return;
     final playbackStarted = await _audio.startPlayback();
+    if (!mounted || generation != _connectionGeneration || !_connected) return;
     final micAllowed = await _audio.requestMicPermission();
+    if (!mounted || generation != _connectionGeneration || !_connected) return;
     var micStarted = false;
     if (micAllowed && !_muted) {
       micStarted = await _audio.startMic();
     }
-    if (!mounted) return;
+    if (!mounted || generation != _connectionGeneration || !_connected) return;
     setState(() {
       _diagnostics = _withAudioState(_diagnostics).copyWith(
-        state: micAllowed && micStarted
+        state: _transferring
+            ? AppConnectionState.transferring
+            : micAllowed && micStarted
             ? AppConnectionState.connected
             : AppConnectionState.degraded,
         playbackRunning: playbackStarted,
@@ -1164,7 +1187,7 @@ class _HomeScreenState extends State<_HomeScreen> {
     }
 
     final gate = AudioGate(
-      connected: _connected,
+      connected: _connected && !_transferring,
       muted: _muted,
       openMic: _effectiveOpenMic,
       pttActive: _pttActive,
@@ -1183,9 +1206,9 @@ class _HomeScreenState extends State<_HomeScreen> {
     }
     _micPacketsSinceDiagnosticsUpdate = 0;
     setState(() {
-      _diagnostics = _withAudioState(_diagnostics).copyWith(
-        micPacketsSent: _micPacketsSentTotal,
-      );
+      _diagnostics = _withAudioState(
+        _diagnostics,
+      ).copyWith(micPacketsSent: _micPacketsSentTotal);
     });
   }
 
@@ -1197,9 +1220,9 @@ class _HomeScreenState extends State<_HomeScreen> {
     }
     _micPacketsSinceDiagnosticsUpdate = 0;
     setState(() {
-      _diagnostics = _withAudioState(_diagnostics).copyWith(
-        micPacketsSent: _micPacketsSentTotal,
-      );
+      _diagnostics = _withAudioState(
+        _diagnostics,
+      ).copyWith(micPacketsSent: _micPacketsSentTotal);
     });
   }
 
@@ -1209,8 +1232,9 @@ class _HomeScreenState extends State<_HomeScreen> {
   }) async {
     setState(() {
       _muted = !enabled;
-      _notificationOpenMicOverride =
-          enabled ? notificationOpenMicOverride : false;
+      _notificationOpenMicOverride = enabled
+          ? notificationOpenMicOverride
+          : false;
       if (_muted) _pttActive = false;
     });
     if (!enabled) {
@@ -1392,6 +1416,8 @@ class _HomeScreenState extends State<_HomeScreen> {
         return 'Ready to connect';
       case AppConnectionState.connecting:
         return 'Connecting to server...';
+      case AppConnectionState.transferring:
+        return 'Changing server';
       case AppConnectionState.authenticated:
         return 'Signed in';
       case AppConnectionState.connected:
@@ -1455,8 +1481,9 @@ class _HomeScreenState extends State<_HomeScreen> {
           selectedIcon: const Icon(Icons.volume_up),
           icon: const Icon(Icons.volume_up_outlined),
           style: IconButton.styleFrom(
-            backgroundColor:
-                selected ? const Color(0xFF55C055) : const Color(0xFFE8ECDC),
+            backgroundColor: selected
+                ? const Color(0xFF55C055)
+                : const Color(0xFFE8ECDC),
             foregroundColor: const Color(0xFF102010),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
@@ -1491,7 +1518,12 @@ class _StatusLine extends StatelessWidget {
 }
 
 class _PushToTalkOverlay extends StatefulWidget {
-  const _PushToTalkOverlay({required this.onTalkingChanged});
+  const _PushToTalkOverlay({
+    required this.onTalkingChanged,
+    required this.available,
+  });
+
+  final ValueNotifier<bool> available;
 
   final ValueChanged<bool> onTalkingChanged;
 
@@ -1502,7 +1534,24 @@ class _PushToTalkOverlay extends StatefulWidget {
 class _PushToTalkOverlayState extends State<_PushToTalkOverlay> {
   bool _talking = false;
 
+  @override
+  void initState() {
+    super.initState();
+    widget.available.addListener(_availabilityChanged);
+  }
+
+  void _availabilityChanged() {
+    if (!widget.available.value) _setTalking(false);
+  }
+
+  @override
+  void dispose() {
+    widget.available.removeListener(_availabilityChanged);
+    super.dispose();
+  }
+
   void _setTalking(bool talking) {
+    talking = talking && widget.available.value;
     if (_talking == talking) return;
     setState(() => _talking = talking);
     widget.onTalkingChanged(talking);
