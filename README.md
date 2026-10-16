@@ -12,7 +12,7 @@ Svg-App is the official Android companion for [SimpleVoice-Geyser](https://githu
 
 - **Opus audio:** native Opus microphone encoding and `svg-v2` spatial playback, with PCM fallback when the server allows it.
 - **Minecraft-inspired UI:** Now the svg-app matches the UI from the Simple Voice Geyser plugin, with textured backgrounds, beveled controls, and dedicated Voice and Chat tabs.
-- **Four languages:** English, Polski, Italiano, and Español. By default and if it's available, the svg-aoo will follow your device language, otherwise you can choose one of the current available options and switch during a call without having to reconnect.
+- **Four languages:** English, Polski, Italiano, and Español. By default and if it's available, the svg-app will follow your device language, otherwise, you can choose one of the current available options and switch during a call without having to reconnect.
 - **Improved push-to-talk:** inline hold-to-talk and fullscreen controls, with screen-reader support.
 - **Localized notifications:** mute, change audio output, reply to chat, or leave the call from Android's notification controls.
 - **Connection updates:** support for upcoming 0.1.5 and Velocity server switching, alongside existing 0.1.4 and 0.1.3 compatibility.
