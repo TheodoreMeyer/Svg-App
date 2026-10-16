@@ -366,6 +366,63 @@ void main() {
       },
     );
 
+    for (var targetIndex = 0; targetIndex < 3; targetIndex++) {
+      test(
+        'authenticates target ${supportedTargetServerVersions[targetIndex]} without an update error',
+        () async {
+          final sockets = List.generate(3, (_) => _FakeVoiceWebSocket());
+          var connects = 0;
+          final packets = <Map<String, Object?>>[];
+          final client = SimpleVoiceClient(
+            Uri.parse('ws://example/ws'),
+            connector: (_) async => sockets[connects++],
+          );
+          await client.connect(
+            username: 'player',
+            password: 'secret',
+            onControlPacket: packets.add,
+            onAudioFrame: (_) {},
+            onClosed: (_, _) => fail('Supported target closed'),
+          );
+          client.sendCapabilities();
+          for (var index = 0; index < targetIndex; index++) {
+            sockets[index].emit(
+              jsonEncode({
+                'type': 'error',
+                'message': appProtocolUnsupportedMessage,
+              }),
+            );
+            await Future<void>.delayed(Duration.zero);
+            await sockets[index].finish(
+              code: 4008,
+              reason: appProtocolUnsupportedReason,
+            );
+            await Future<void>.delayed(Duration.zero);
+            client.sendCapabilities();
+            expect(packets, isEmpty);
+          }
+          sockets[targetIndex].emit(
+            jsonEncode({'type': 'status', 'message': 'Connected as player.'}),
+          );
+          await Future<void>.delayed(Duration.zero);
+          client.sendCapabilities();
+          client.sendMicPacket(Uint8List(1920));
+          expect(packets.single['type'], 'status');
+          expect(connects, targetIndex + 1);
+          expect(
+            (_sentJoin(sockets[targetIndex])['clientType']
+                as Map)['serverVersion'],
+            supportedTargetServerVersions[targetIndex],
+          );
+          expect(sockets[targetIndex].sent.length, 3);
+          for (var index = 0; index < targetIndex; index++) {
+            expect(sockets[index].sent.length, 1);
+          }
+          await client.disconnect();
+        },
+      );
+    }
+
     test('does not retry non-compatibility auth close', () async {
       final socket = _FakeVoiceWebSocket();
       var connects = 0;

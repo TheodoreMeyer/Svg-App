@@ -8,6 +8,7 @@ import android.app.RemoteInput
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.os.Build
 import android.os.IBinder
 
@@ -17,6 +18,9 @@ class CallNotificationService : Service() {
     private var muted = false
     private var speaker = false
     private var transientStatus = ""
+    private var labels = Bundle()
+
+    private fun label(key: String, fallback: String) = labels.getString(key) ?: fallback
 
     override fun onCreate() {
         super.onCreate()
@@ -39,6 +43,7 @@ class CallNotificationService : Service() {
             }
             SERVICE_START, SERVICE_UPDATE -> {
                 readState(intent)
+                createChannel()
                 startForeground(NOTIFICATION_ID, buildNotification())
             }
         }
@@ -46,6 +51,7 @@ class CallNotificationService : Service() {
     }
 
     private fun readState(intent: Intent) {
+        labels = intent.getBundleExtra("labels") ?: Bundle()
         server = intent.getStringExtra(EXTRA_SERVER).orEmpty()
         status = intent.getStringExtra(EXTRA_STATUS).orEmpty()
         muted = intent.getBooleanExtra(EXTRA_MUTED, false)
@@ -54,12 +60,12 @@ class CallNotificationService : Service() {
     }
 
     private fun buildNotification(): Notification {
-        val title = if (server.isBlank()) {
+        val title = label("title", if (server.isBlank()) {
             "Connected to voice chat"
         } else {
             "Connected to $server"
-        }
-        val body = transientStatus.ifBlank { status.ifBlank { "Voice chat active" } }
+        })
+        val body = transientStatus.ifBlank { status.ifBlank { label("voiceActive", "Voice chat active") } }
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
         } else {
@@ -85,7 +91,7 @@ class CallNotificationService : Service() {
 
     private fun micAction(): Notification.Action {
         val action = if (muted) ACTION_UNMUTE else ACTION_MUTE
-        val title = if (muted) "Unmute" else "Mute"
+        val title = if (muted) label("unmute", "Unmute") else label("mute", "Mute")
         return Notification.Action.Builder(
             android.R.drawable.ic_btn_speak_now,
             title,
@@ -95,7 +101,7 @@ class CallNotificationService : Service() {
 
     private fun routeAction(): Notification.Action {
         val action = if (speaker) ACTION_EARPIECE else ACTION_SPEAKER
-        val title = if (speaker) "Earpiece" else "Speaker"
+        val title = if (speaker) label("earpiece", "Earpiece") else label("speaker", "Speaker")
         return Notification.Action.Builder(
             android.R.drawable.ic_lock_silent_mode_off,
             title,
@@ -105,11 +111,11 @@ class CallNotificationService : Service() {
 
     private fun replyAction(): Notification.Action {
         val remoteInput = RemoteInput.Builder(REPLY_KEY)
-            .setLabel("Type a message")
+            .setLabel(label("replyHint", "Type a message"))
             .build()
         return Notification.Action.Builder(
             android.R.drawable.ic_dialog_email,
-            "Chat",
+            label("chat", "Chat"),
             actionIntent(ACTION_REPLY, immutable = false)
         ).addRemoteInput(remoteInput).build()
     }
@@ -117,7 +123,7 @@ class CallNotificationService : Service() {
     private fun hangUpAction(): Notification.Action {
         return Notification.Action.Builder(
             android.R.drawable.sym_call_missed,
-            "Hang up",
+            label("hangUp", "Hang up"),
             actionIntent(ACTION_HANG_UP, immutable = true)
         ).build()
     }
@@ -150,10 +156,10 @@ class CallNotificationService : Service() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Voice chat",
+            label("channel", "Voice chat"),
             NotificationManager.IMPORTANCE_LOW
         )
-        channel.description = "Active Simple Voice App call controls"
+        channel.description = label("channelDescription", "Active Svg-App call controls")
         notificationManager().createNotificationChannel(channel)
     }
 
@@ -209,6 +215,11 @@ class CallNotificationService : Service() {
         ): Intent {
             return Intent(context, CallNotificationService::class.java).apply {
                 this.action = action
+                val labelBundle = Bundle()
+                (args["labels"] as? Map<*, *>)?.forEach { (key, value) ->
+                    if (key is String && value is String) labelBundle.putString(key, value)
+                }
+                putExtra("labels", labelBundle)
                 putExtra(EXTRA_SERVER, args["server"]?.toString().orEmpty())
                 putExtra(EXTRA_STATUS, args["status"]?.toString().orEmpty())
                 putExtra(EXTRA_MUTED, args["muted"] as? Boolean ?: false)

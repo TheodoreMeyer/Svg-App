@@ -3,6 +3,11 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show LicenseRegistry, LicenseEntryWithLineBreaks;
+import 'package:flutter/services.dart' show rootBundle, SystemUiOverlayStyle;
+
+import 'l10n/generated/app_localizations.dart';
 
 import 'src/audio/audio_bridge.dart';
 import 'src/audio/audio_gate.dart';
@@ -14,8 +19,17 @@ import 'src/protocol/connection_target.dart';
 import 'src/protocol/packets.dart';
 import 'src/protocol/simple_voice_client.dart';
 import 'src/settings/credential_store.dart';
+import 'src/ui/minecraft_widgets.dart';
 
 void main() {
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      'Press Start 2P',
+    ], await rootBundle.loadString('assets/fonts/OFL.txt'));
+    yield LicenseEntryWithLineBreaks([
+      'SimpleVoice-Geyser assets and wording',
+    ], await rootBundle.loadString('assets/SimpleVoice-Geyser-LICENSE.txt'));
+  });
   runApp(const SimpleVoiceApp());
 }
 
@@ -26,13 +40,10 @@ const _joinConfirmationTimeoutMessage =
     'Connected to the server, but the app did not receive the login '
     'confirmation. Please try again.';
 const _micDiagnosticsBatchSize = 25;
-const _serverRequiredMessage = 'Please provide a valid server address';
-const _usernameRequiredMessage = 'Please enter a valid username';
-const _passwordRequiredMessage = 'Please enter your password';
 
 enum _JoinField { server, username, password }
 
-class SimpleVoiceApp extends StatelessWidget {
+class SimpleVoiceApp extends StatefulWidget {
   const SimpleVoiceApp({
     super.key,
     this.initiallyConnected = false,
@@ -40,6 +51,7 @@ class SimpleVoiceApp extends StatelessWidget {
     this.notificationBridge,
     this.clientFactory,
     this.showOpeningSplash = true,
+    this.credentialStore,
   });
 
   final bool initiallyConnected;
@@ -47,38 +59,78 @@ class SimpleVoiceApp extends StatelessWidget {
   final CallNotificationBridge? notificationBridge;
   final SimpleVoiceClientFactory? clientFactory;
   final bool showOpeningSplash;
+  final CredentialStore? credentialStore;
+
+  @override
+  State<SimpleVoiceApp> createState() => _SimpleVoiceAppState();
+}
+
+class _SimpleVoiceAppState extends State<SimpleVoiceApp> {
+  late final _store = widget.credentialStore ?? CredentialStore();
+  String? _language;
+  bool _languageSelected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLanguage();
+  }
+
+  Future<void> _loadLanguage() async {
+    try {
+      final language = await _store.loadLanguage();
+      if (!mounted || _languageSelected) return;
+      if (AppLocalizations.supportedLocales.any(
+        (locale) => locale.languageCode == language,
+      )) {
+        setState(() => _language = language);
+      }
+    } catch (_) {
+      // Device language remains usable when secure storage is unavailable.
+    }
+  }
+
+  Future<void> _changeLanguage(String? language) async {
+    _languageSelected = true;
+    setState(() => _language = language);
+    try {
+      await _store.saveLanguage(language);
+    } catch (_) {
+      // The current session can still use the selected language.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Simple Voice App',
+      title: 'Svg-App',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF55C055)),
-        scaffoldBackgroundColor: const Color(0xFFF7F8F3),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-          focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Color(0xFF63A942), width: 1.5),
-          ),
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light.copyWith(
+          statusBarColor: Colors.transparent,
+          systemNavigationBarColor: Colors.transparent,
         ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF55C055),
-            foregroundColor: const Color(0xFF102010),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
+        child: child!,
       ),
+      locale: _language == null ? null : Locale(_language!),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localeResolutionCallback: (locale, supported) => supported.firstWhere(
+        (candidate) => candidate.languageCode == locale?.languageCode,
+        orElse: () => const Locale('en'),
+      ),
+      theme: minecraftTheme(),
       home: _OpeningGate(
-        showOpeningSplash: showOpeningSplash && !initiallyConnected,
+        showOpeningSplash:
+            widget.showOpeningSplash && !widget.initiallyConnected,
         child: _HomeScreen(
-          initiallyConnected: initiallyConnected,
-          audioBridge: audioBridge,
-          notificationBridge: notificationBridge,
-          clientFactory: clientFactory,
+          initiallyConnected: widget.initiallyConnected,
+          audioBridge: widget.audioBridge,
+          notificationBridge: widget.notificationBridge,
+          clientFactory: widget.clientFactory,
+          store: _store,
+          language: _language,
+          onLanguageChanged: _changeLanguage,
         ),
       ),
     );
@@ -150,6 +202,15 @@ class _OpeningSplashState extends State<_OpeningSplash>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _startTimer?.cancel();
+      _controller.value = 1;
+    }
+  }
+
+  @override
   void dispose() {
     _startTimer?.cancel();
     _finishTimer?.cancel();
@@ -160,17 +221,17 @@ class _OpeningSplashState extends State<_OpeningSplash>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8F3),
+      backgroundColor: const Color(0xFF30251C),
       body: SafeArea(
         child: Stack(
           children: [
             Align(
               alignment: const Alignment(0, -0.52),
               child: Text(
-                'Simple Voice App',
+                'Svg-App',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: const Color(0xFF1A2413),
+                  color: Colors.white,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -202,12 +263,18 @@ class _HomeScreen extends StatefulWidget {
     this.audioBridge,
     this.notificationBridge,
     this.clientFactory,
+    required this.store,
+    required this.language,
+    required this.onLanguageChanged,
   });
 
   final bool initiallyConnected;
   final AudioBridge? audioBridge;
   final CallNotificationBridge? notificationBridge;
   final SimpleVoiceClientFactory? clientFactory;
+  final CredentialStore store;
+  final String? language;
+  final ValueChanged<String?> onLanguageChanged;
 
   @override
   State<_HomeScreen> createState() => _HomeScreenState();
@@ -219,6 +286,7 @@ class _HomeScreenState extends State<_HomeScreen> {
   bool _openMic = true;
   bool _pttActive = false;
   bool _transferring = false;
+  bool _pttOverlayOpen = false;
   int _connectionGeneration = 0;
   final _pttAvailable = ValueNotifier<bool>(true);
   bool _notificationOpenMicOverride = false;
@@ -254,16 +322,73 @@ class _HomeScreenState extends State<_HomeScreen> {
   final _serverFocusNode = FocusNode();
   final _usernameFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
-  final _store = CredentialStore();
+  CredentialStore get _store => widget.store;
+  AppLocalizations get _l => AppLocalizations.of(context);
+  Locale? _lastLocale;
   final List<String> _timeline = [];
   late DiagnosticsSnapshot _diagnostics;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final locale = Localizations.localeOf(context);
+    if (_lastLocale != locale) {
+      _lastLocale = locale;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _connected) unawaited(_updateCallNotification());
+      });
+    }
+  }
+
+  void _showLanguages() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_l.language, style: Theme.of(context).textTheme.titleLarge),
+              for (final entry in <String, String>{
+                'system': _l.systemLanguage,
+                'en': 'English',
+                'pl': 'Polski',
+                'it': 'Italiano',
+                'es': 'Español',
+              }.entries)
+                ListTile(
+                  key: Key('locale_${entry.key}'),
+                  title: Text(entry.value),
+                  selected: (widget.language ?? 'system') == entry.key,
+                  trailing: (widget.language ?? 'system') == entry.key
+                      ? const Icon(Icons.check)
+                      : null,
+                  onTap: () {
+                    widget.onLanguageChanged(
+                      entry.key == 'system' ? null : entry.key,
+                    );
+                    Navigator.of(context).pop();
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _languageButton() => IconButton(
+    key: const Key('languageButton'),
+    tooltip: _l.language,
+    onPressed: _showLanguages,
+    icon: const Icon(Icons.language),
+  );
 
   @override
   void initState() {
     super.initState();
     _diagnostics = DiagnosticsSnapshot(
-      serverUrl: 'https://voice.example.com',
-      websocketUrl: 'wss://voice.example.com/ws',
       state: widget.initiallyConnected
           ? AppConnectionState.connected
           : AppConnectionState.idle,
@@ -320,7 +445,7 @@ class _HomeScreenState extends State<_HomeScreen> {
         _showMinecraftPortWarning = hasMinecraftServerPort(saved.serverUrl);
       });
     } catch (_) {
-      // Secure storage availability varies in tests and early installs.
+      // Keep manual sign-in available when saved credentials cannot be read.
     }
   }
 
@@ -427,6 +552,7 @@ class _HomeScreenState extends State<_HomeScreen> {
     required int shake,
     required Widget child,
   }) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
     return TweenAnimationBuilder<double>(
       key: ValueKey('$shakeKey:$shake'),
       tween: Tween(begin: 1, end: 0),
@@ -441,152 +567,202 @@ class _HomeScreenState extends State<_HomeScreen> {
 
   Widget _joinScreen() {
     return Scaffold(
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            const SizedBox(height: 20),
-            Center(
-              child: Image.asset(
-                'assets/images/icon.png',
-                width: 96,
-                height: 96,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Simple Voice App',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: const Color(0xFF1A2413),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 28),
-            _shakingField(
-              shakeKey: 'serverField',
-              shake: _serverFieldShake,
-              child: TextField(
-                key: Key('serverUrlField'),
-                controller: _serverController,
-                focusNode: _serverFocusNode,
-                onChanged: _updateServerPortWarning,
-                decoration: InputDecoration(
-                  labelText: 'Server',
-                  hintText: 'voice.example.com',
-                  errorText: _serverFieldError ? _serverRequiredMessage : null,
-                ),
-                keyboardType: TextInputType.url,
-              ),
-            ),
-            if (_showMinecraftPortWarning) ...[
-              const SizedBox(height: 6),
-              TweenAnimationBuilder<double>(
-                key: ValueKey(_minecraftPortWarningShake),
-                tween: Tween(begin: 1, end: 0),
-                duration: const Duration(milliseconds: 180),
-                builder: (context, value, child) {
-                  final offset = math.sin(value * math.pi * 4) * 4;
-                  return Transform.translate(
-                    offset: Offset(offset, 0),
-                    child: child,
-                  );
-                },
-                child: const Text(
-                  minecraftServerPortWarning,
-                  key: Key('minecraftPortWarning'),
-                  style: TextStyle(
-                    color: Color(0xFFB3261E),
-                    fontSize: 13,
-                    height: 1.25,
+      body: DirtBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: BeveledPanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Image.asset(
+                            'assets/images/icon.png',
+                            width: 40,
+                            height: 40,
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Svg-App',
+                              style: TextStyle(
+                                fontFamily: 'PressStart2P',
+                                fontSize: 16,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                          _languageButton(),
+                        ],
+                      ),
+                      const Text(
+                        'SimpleVoice-Geyser',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF454545),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _l.joinTitle,
+                        style: pixelHeading,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      _shakingField(
+                        shakeKey: 'serverField',
+                        shake: _serverFieldShake,
+                        child: TextField(
+                          style: const TextStyle(color: Colors.white),
+                          enabled: !_busy,
+                          key: Key('serverUrlField'),
+                          controller: _serverController,
+                          focusNode: _serverFocusNode,
+                          onChanged: _updateServerPortWarning,
+                          decoration: InputDecoration(
+                            labelText: _l.server,
+                            hintText: 'voice.example.com',
+                            errorText: _serverFieldError
+                                ? _l.serverRequired
+                                : null,
+                          ),
+                          keyboardType: TextInputType.url,
+                        ),
+                      ),
+                      if (_showMinecraftPortWarning) ...[
+                        const SizedBox(height: 6),
+                        _shakingField(
+                          shakeKey: 'minecraftPortWarningShake',
+                          shake: _minecraftPortWarningShake,
+                          child: Text(
+                            _l.portWarning,
+                            key: Key('minecraftPortWarning'),
+                            style: const TextStyle(
+                              color: Color(0xFFB3261E),
+                              fontSize: 13,
+                              height: 1.25,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      _shakingField(
+                        shakeKey: 'usernameField',
+                        shake: _usernameFieldShake,
+                        child: TextField(
+                          style: const TextStyle(color: Colors.white),
+                          enabled: !_busy,
+                          key: Key('usernameField'),
+                          controller: _usernameController,
+                          focusNode: _usernameFocusNode,
+                          onChanged: (_) =>
+                              _clearRequiredFieldError(_JoinField.username),
+                          decoration: InputDecoration(
+                            labelText: _l.username,
+                            errorText: _usernameFieldError
+                                ? _l.usernameRequired
+                                : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _shakingField(
+                        shakeKey: 'passwordField',
+                        shake: _passwordFieldShake,
+                        child: TextField(
+                          style: const TextStyle(color: Colors.white),
+                          enabled: !_busy,
+                          key: Key('passwordField'),
+                          controller: _passwordController,
+                          focusNode: _passwordFocusNode,
+                          onChanged: (_) =>
+                              _clearRequiredFieldError(_JoinField.password),
+                          decoration: InputDecoration(
+                            labelText: _l.password,
+                            errorText: _passwordFieldError
+                                ? _l.passwordRequired
+                                : null,
+                            suffixIcon: IconButton(
+                              key: const Key('passwordVisibilityButton'),
+                              tooltip: _passwordVisible
+                                  ? _l.hidePassword
+                                  : _l.showPassword,
+                              onPressed: () {
+                                setState(
+                                  () => _passwordVisible = !_passwordVisible,
+                                );
+                              },
+                              icon: Icon(
+                                _passwordVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
+                            ),
+                          ),
+                          obscureText: !_passwordVisible,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      CheckboxListTile(
+                        value: _rememberPassword,
+                        onChanged: (value) {
+                          setState(() => _rememberPassword = value ?? false);
+                        },
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: Text(_l.rememberPassword),
+                      ),
+
+                      StoneButton(
+                        key: const Key('joinButton'),
+                        label: _busy ? _l.connecting : _l.join,
+                        primary: true,
+                        onPressed: _busy ? null : _connect,
+                      ),
+                      if (_busy &&
+                          _diagnostics.state == AppConnectionState.connecting)
+                        TextButton(
+                          onPressed: _disconnect,
+                          child: Text(_l.cancel),
+                        ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: StoneButton(
+                              key: const Key('testAudioButton'),
+                              label: _localAudioTest
+                                  ? _l.stopAudioTest
+                                  : _l.testAudio,
+                              icon: _localAudioTest
+                                  ? Icons.stop
+                                  : Icons.hearing,
+                              onPressed: _busy ? null : _toggleLocalAudioTest,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          SizedBox(
+                            width: 80,
+                            child: _speakerToggleButton(
+                              key: const Key('joinSpeakerToggleButton'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_localAudioTest) ...[
+                        const SizedBox(height: 12),
+                        _StatusLine(text: _localAudioStatusText()),
+                      ],
+                    ],
                   ),
                 ),
               ),
-            ],
-            const SizedBox(height: 12),
-            _shakingField(
-              shakeKey: 'usernameField',
-              shake: _usernameFieldShake,
-              child: TextField(
-                key: Key('usernameField'),
-                controller: _usernameController,
-                focusNode: _usernameFocusNode,
-                onChanged: (_) => _clearRequiredFieldError(_JoinField.username),
-                decoration: InputDecoration(
-                  labelText: 'Username',
-                  errorText: _usernameFieldError
-                      ? _usernameRequiredMessage
-                      : null,
-                ),
-              ),
             ),
-            const SizedBox(height: 12),
-            _shakingField(
-              shakeKey: 'passwordField',
-              shake: _passwordFieldShake,
-              child: TextField(
-                key: Key('passwordField'),
-                controller: _passwordController,
-                focusNode: _passwordFocusNode,
-                onChanged: (_) => _clearRequiredFieldError(_JoinField.password),
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  errorText: _passwordFieldError
-                      ? _passwordRequiredMessage
-                      : null,
-                  suffixIcon: IconButton(
-                    key: const Key('passwordVisibilityButton'),
-                    tooltip: _passwordVisible
-                        ? 'Hide password'
-                        : 'Show password',
-                    onPressed: () {
-                      setState(() => _passwordVisible = !_passwordVisible);
-                    },
-                    icon: Icon(
-                      _passwordVisible
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                    ),
-                  ),
-                ),
-                obscureText: !_passwordVisible,
-              ),
-            ),
-            const SizedBox(height: 8),
-            CheckboxListTile(
-              value: _rememberPassword,
-              onChanged: (value) {
-                setState(() => _rememberPassword = value ?? false);
-              },
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              title: const Text('Remember password'),
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              key: const Key('joinButton'),
-              onPressed: _busy ? null : _connect,
-              child: Text(_busy ? 'Connecting' : 'Join'),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              key: const Key('testAudioButton'),
-              onPressed: _busy ? null : _toggleLocalAudioTest,
-              icon: Icon(_localAudioTest ? Icons.stop : Icons.hearing),
-              label: Text(_localAudioTest ? 'Stop audio test' : 'Test audio'),
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: _speakerToggleButton(
-                key: const Key('joinSpeakerToggleButton'),
-              ),
-            ),
-            if (_localAudioTest) ...[
-              const SizedBox(height: 8),
-              _StatusLine(text: _localAudioStatusText()),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -595,138 +771,224 @@ class _HomeScreenState extends State<_HomeScreen> {
   Widget _joinedShell() {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Simple Voice App'),
+        title: const Text('Svg-App', style: pixelHeading),
         actions: [
+          _languageButton(),
           IconButton(
             key: const Key('diagnosticsButton'),
-            tooltip: 'Diagnostics',
+            tooltip: _l.diagnostics,
             onPressed: () => unawaited(_showDiagnostics()),
             icon: const Icon(Icons.article_outlined),
           ),
           IconButton(
-            tooltip: 'Leave',
+            tooltip: _l.leave,
             onPressed: _disconnect,
             icon: const Icon(Icons.logout),
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _StatusLine(
-              text: [
-                _connectionStatusText(),
-                _diagnostics.selectedAudioMode,
-                _micStatusText(),
-              ].join(' | '),
+      body: DirtBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(12),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: BeveledPanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        _l.connectedAs(_displayUsername()),
+                        style: pixelHeading.copyWith(
+                          color: const Color(0xFF286016),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _callNotificationServer(),
+                        style: const TextStyle(fontSize: 13),
+                        softWrap: true,
+                      ),
+                      const SizedBox(height: 12),
+                      Semantics(
+                        liveRegion: true,
+                        child: _StatusLine(text: _connectionStatusText()),
+                      ),
+                      if (_transferring) ...[
+                        const SizedBox(height: 8),
+                        Text(_l.transferHint),
+                      ],
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: StoneButton(
+                              label: _l.voice,
+                              primary: _tab == 0,
+                              onPressed: () => setState(() => _tab = 0),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: StoneButton(
+                              label: _l.chat,
+                              primary: _tab == 1,
+                              onPressed: () => setState(() => _tab = 1),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _callControls(),
+                      const Divider(height: 24, color: Color(0xFF898989)),
+                      _tab == 0 ? _voiceTab() : _chatTab(),
+                    ],
+                  ),
+                ),
+              ),
             ),
-            SegmentedButton<int>(
-              segments: const [
-                ButtonSegment(value: 0, label: Text('Voice')),
-                ButtonSegment(value: 1, label: Text('Chat')),
-              ],
-              selected: {_tab},
-              onSelectionChanged: (value) => setState(() => _tab = value.first),
-            ),
-            Expanded(child: _tab == 0 ? _voiceTab() : _chatTab()),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _voiceTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const Text(
-          'Currently in voicechat',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Text('Username ${_displayUsername()}'),
-        const SizedBox(height: 8),
-        Text('Microphone: ${_micStatusText()}'),
-        Text('Playback: ${_playbackStatusText()} | ${_audioRouteText()}'),
-        if (_diagnostics.audioError.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            _humanReadableAudioError(_diagnostics.audioError),
-            style: const TextStyle(color: Color(0xFF8E6308)),
+  Widget _callControls() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(_l.microphone),
+              subtitle: Text(_muted ? _l.muted : _l.unmuted),
+              value: !_muted,
+              onChanged: _setMicEnabled,
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 80,
+            child: _speakerToggleButton(
+              key: const Key('voiceSpeakerToggleButton'),
+            ),
           ),
         ],
-        const SizedBox(height: 24),
-        SwitchListTile(
-          title: const Text('Microphone'),
-          subtitle: Text(_muted ? 'Muted' : 'Unmuted'),
-          value: !_muted,
-          onChanged: _setMicEnabled,
-        ),
-        SwitchListTile(
-          key: const Key('openMicSwitch'),
-          title: const Text('Open mic'),
-          subtitle: const Text('Disable for push to talk only'),
-          value: _openMic,
-          onChanged: (value) {
-            setState(() {
-              _openMic = value;
-              _notificationOpenMicOverride = false;
-            });
-            unawaited(_updateCallNotification());
-          },
-        ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: _speakerToggleButton(
-            key: const Key('voiceSpeakerToggleButton'),
+      ),
+      SwitchListTile(
+        key: const Key('openMicSwitch'),
+        contentPadding: EdgeInsets.zero,
+        title: Text(_l.openMic),
+        subtitle: Text(_l.pttOnly),
+        value: _openMic,
+        onChanged: (value) {
+          setState(() {
+            _openMic = value;
+            _pttActive = false;
+            _notificationOpenMicOverride = false;
+          });
+          unawaited(_updateCallNotification());
+        },
+      ),
+      if (!_effectiveOpenMic) ...[
+        const SizedBox(height: 8),
+        HoldToTalk(
+          key: const Key('inlinePtt'),
+          available: _pttAvailable,
+          enabled: !_muted && _diagnostics.micRunning,
+          label: _l.holdToTalk,
+          talkingLabel: _l.talking,
+          hint: _l.pttAccessibleHint,
+          onTalkingChanged: (talking) => setState(
+            () =>
+                _pttActive = talking && !_transferring && _connected && !_muted,
           ),
         ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          key: const Key('openPttButton'),
-          onPressed: _showPtt,
-          icon: const Icon(Icons.mic),
-          label: const Text('Push to talk'),
+        const SizedBox(height: 8),
+      ],
+      StoneButton(
+        key: const Key('openPttButton'),
+        label: _l.fullscreenPtt,
+        icon: Icons.fullscreen,
+        onPressed: _transferring ? null : _showPtt,
+      ),
+    ],
+  );
+
+  Widget _voiceTab() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        _l.inVoiceChat,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(height: 8),
+      Text(_l.usernameValue(_displayUsername())),
+      const SizedBox(height: 8),
+      Text(_l.microphoneValue(_micStatusText())),
+      Text(_l.playbackValue(_playbackStatusText(), _audioRouteText())),
+      if (_diagnostics.audioError.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Text(
+          _humanReadableAudioError(_diagnostics.audioError),
+          style: const TextStyle(color: Color(0xFF9B211C)),
         ),
       ],
-    );
-  }
+    ],
+  );
 
-  Widget _chatTab() {
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: Text(
-                _timeline.isEmpty ? 'Server chat' : _timeline.join('\n'),
-              ),
+  Widget _chatTab() => Column(
+    children: [
+      Container(
+        width: double.infinity,
+        height: math.max(
+          120,
+          math.min(280, MediaQuery.sizeOf(context).height * 0.3),
+        ),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF252525),
+          border: Border.all(color: const Color(0xFF777777), width: 2),
+        ),
+        child: SingleChildScrollView(
+          reverse: true,
+          child: SelectableText(
+            _timeline.isEmpty ? _l.serverChat : _timeline.join('\n'),
+            style: const TextStyle(
+              color: Color(0xFFF0F0F0),
+              fontSize: 16,
+              height: 1.5,
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  key: const Key('chatInput'),
-                  controller: _chatController,
-                  decoration: const InputDecoration(
-                    hintText: 'Write a message',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(onPressed: _sendChat, child: const Text('Send')),
-            ],
+      ),
+      const SizedBox(height: 12),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: TextField(
+              style: const TextStyle(color: Colors.white),
+              key: const Key('chatInput'),
+              controller: _chatController,
+              minLines: 1,
+              maxLines: 4,
+              decoration: InputDecoration(hintText: _l.writeMessage),
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _sendChat(),
+            ),
           ),
-        ),
-      ],
-    );
-  }
+          const SizedBox(width: 8),
+          StoneButton(
+            label: _l.send,
+            onPressed: _transferring ? null : _sendChat,
+          ),
+        ],
+      ),
+    ],
+  );
 
   void _showPtt() {
     if (!_connected || _transferring) return;
@@ -738,6 +1000,7 @@ class _HomeScreenState extends State<_HomeScreen> {
       _notificationOpenMicOverride = false;
       _pttActive = false;
     });
+    _pttOverlayOpen = true;
     unawaited(_setMicEnabled(true));
     unawaited(_updateCallNotification());
     showDialog<void>(
@@ -751,7 +1014,8 @@ class _HomeScreenState extends State<_HomeScreen> {
         },
       ),
     ).whenComplete(() {
-      if (!mounted) return;
+      _pttOverlayOpen = false;
+      if (!mounted || !_connected) return;
       setState(() {
         _openMic = previousOpenMic;
         _notificationOpenMicOverride = false;
@@ -769,12 +1033,27 @@ class _HomeScreenState extends State<_HomeScreen> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: SelectableText(_diagnostics.redactedText()),
-        );
-      },
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_l.diagnostics, style: pixelHeading),
+                const SizedBox(height: 12),
+                Text(_l.diagnosticsHint),
+                const SizedBox(height: 16),
+                SelectableText(_diagnostics.redactedText()),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -872,17 +1151,36 @@ class _HomeScreenState extends State<_HomeScreen> {
     final message = controlPacketMessage(packet);
     var becameConnected = false;
     setState(() {
-      _timeline.add('$type: $message');
+      if (type == 'chat' ||
+          type == 'info' ||
+          (type == 'status' &&
+              !isConnectedStatusPacket(packet) &&
+              !isTransferStatusPacket(packet))) {
+        _timeline.add(message);
+      }
       if (isConnectedStatusPacket(packet)) {
         _joinConfirmationTimer?.cancel();
         _busy = false;
         becameConnected = !_connected;
+        if (becameConnected) {
+          _localAudioTest = false;
+          _localAudioActive = false;
+        }
+        final wasTransferring = _transferring;
         _connected = true;
         _transferring = false;
-        _pttAvailable.value = true;
-        _diagnostics = _diagnostics.copyWith(
-          state: AppConnectionState.connected,
-        );
+        _pttAvailable.value = !_muted && _diagnostics.micRunning;
+        if (becameConnected || wasTransferring) {
+          _diagnostics = _diagnostics.copyWith(
+            state:
+                !becameConnected &&
+                    (!_diagnostics.micPermissionGranted ||
+                        !_diagnostics.playbackRunning ||
+                        _diagnostics.audioError.isNotEmpty)
+                ? AppConnectionState.degraded
+                : AppConnectionState.connected,
+          );
+        }
       } else if (_connected && isTransferStatusPacket(packet)) {
         _transferring = true;
         _pttActive = false;
@@ -917,20 +1215,22 @@ class _HomeScreenState extends State<_HomeScreen> {
   }
 
   Future<void> _handleAudioFrame(List<int> bytes) async {
-    if (!mounted) return;
+    if (!mounted || !_connected) return;
+    final generation = _connectionGeneration;
     final unsupportedOpusBefore = _diagnostics.unsupportedOpusFrames;
     final data = Uint8List.fromList(bytes);
     final next = await _incomingAudio.handle(data, _diagnostics);
-    if (!mounted) return;
+    if (!mounted || generation != _connectionGeneration || !_connected) return;
     setState(() => _diagnostics = _withAudioState(next));
     if (next.unsupportedOpusFrames > unsupportedOpusBefore) {
-      _showToast('This server sent an audio format the app cannot play yet.');
+      _showToast(_l.unsupportedAudio);
     }
   }
 
   void _handleClosed(int? code, String reason) {
     if (!mounted) return;
     ++_connectionGeneration;
+    if (_pttOverlayOpen) Navigator.of(context).pop();
     _transferring = false;
     _pttAvailable.value = false;
     _joinConfirmationTimer?.cancel();
@@ -947,7 +1247,13 @@ class _HomeScreenState extends State<_HomeScreen> {
         lastCloseReason: reason,
       );
     });
-    final message = closeMessage(closeCode: code, reason: reason);
+    final message =
+        code == outdatedClientCloseCode &&
+            reason.trim() == appProtocolUnsupportedReason
+        ? _l.updateRequired
+        : reason.trim().isEmpty
+        ? ''
+        : _l.serverDisconnected(reason.trim());
     if (message.isNotEmpty) _showToast(message);
   }
 
@@ -980,7 +1286,7 @@ class _HomeScreenState extends State<_HomeScreen> {
       case 'reply':
         final sent = _sendChatMessage(action.message);
         if (sent) {
-          await _updateCallNotification(transientStatus: 'Message sent');
+          await _updateCallNotification(transientStatus: _l.messageSent);
         }
         return;
       default:
@@ -1002,7 +1308,7 @@ class _HomeScreenState extends State<_HomeScreen> {
           lastCloseReason: _joinConfirmationTimeoutMessage,
         );
       });
-      _showToast(_joinConfirmationTimeoutMessage);
+      _showToast(_l.joinTimeout);
     });
   }
 
@@ -1027,53 +1333,48 @@ class _HomeScreenState extends State<_HomeScreen> {
     if (error is FormatException) {
       switch (error.message) {
         case 'Server URL is required.':
-          return 'Enter the server address.';
+          return _l.serverRequired;
         case 'Server URL must use http or https.':
-          return 'Use an http or https server address.';
+          return _l.addressScheme;
         case 'Enter a valid server URL.':
-          return 'That server address does not look valid.';
+          return _l.invalidAddress;
         case minecraftServerPortWarning:
-          return minecraftServerPortWarning;
+          return _l.portWarning;
         case invalidDiscoveryMessage:
-          return invalidDiscoveryMessage;
+          return _l.invalidDiscovery;
       }
-      return error.message.isEmpty
-          ? 'That server address does not look valid.'
-          : error.message;
+      return error.message.isEmpty ? _l.invalidAddress : error.message;
     }
     final text = error.toString();
     final lower = text.toLowerCase();
     if (lower.contains('connection closed before full header')) {
-      return 'The server closed the connection before voice chat could start. '
-          'Check that you are using the SimpleVoice-Geyser web port, not the '
-          'Minecraft server port.';
+      return _l.earlyClose;
     }
     if (lower.contains('handshake') ||
         lower.contains('certificate') ||
         lower.contains('tls') ||
         lower.contains('ssl')) {
-      return 'Could not establish a secure connection. Use the HTTPS address '
-          'for your SimpleVoice-Geyser web server, or enter http:// only for '
-          'trusted local testing.';
+      return _l.secureConnectionError;
     }
     if (lower.contains('connection refused') ||
         lower.contains('failed host lookup') ||
         lower.contains('network is unreachable') ||
         lower.contains('websocket')) {
-      return 'Could not connect to the server. Check the address and that '
-          'SimpleVoice-Geyser is running.';
+      return _l.connectionError;
     }
     return text;
   }
 
   String _humanReadableServerError(String message) {
+    if (message == appProtocolUnsupportedMessage) return _l.updateRequired;
     final lower = message.toLowerCase();
-    if (lower.contains('password') ||
-        lower.contains('unauthorized') ||
-        lower.contains('auth') ||
-        lower.contains('login')) {
-      return 'The server rejected the login. Check the username and '
-          'password.';
+    if (const {
+      'authentication failed: bad password.',
+      'invalid username or password.',
+      'invalid password.',
+      'authentication failed.',
+    }.contains(lower)) {
+      return _l.loginRejected;
     }
     return message;
   }
@@ -1096,6 +1397,7 @@ class _HomeScreenState extends State<_HomeScreen> {
   }
 
   Future<void> _disconnect() async {
+    if (_pttOverlayOpen) Navigator.of(context).pop();
     ++_connectionGeneration;
     _connected = false;
     _busy = false;
@@ -1135,11 +1437,12 @@ class _HomeScreenState extends State<_HomeScreen> {
       micStarted = await _audio.startMic();
     }
     if (!mounted || generation != _connectionGeneration || !_connected) return;
+    _pttAvailable.value = !_muted && !_transferring && micStarted;
     setState(() {
       _diagnostics = _withAudioState(_diagnostics).copyWith(
         state: _transferring
             ? AppConnectionState.transferring
-            : micAllowed && micStarted
+            : playbackStarted && micAllowed && (_muted || micStarted)
             ? AppConnectionState.connected
             : AppConnectionState.degraded,
         playbackRunning: playbackStarted,
@@ -1149,9 +1452,7 @@ class _HomeScreenState extends State<_HomeScreen> {
       );
     });
     if (!micAllowed) {
-      _showToast(
-        'Microphone permission was denied. You can still listen and use chat.',
-      );
+      _showToast(_l.micDenied);
     } else if (!micStarted && _audio.state.lastError.isNotEmpty) {
       _showToast(_humanReadableAudioError(_audio.state.lastError));
     } else if (!playbackStarted && _audio.state.lastError.isNotEmpty) {
@@ -1230,6 +1531,8 @@ class _HomeScreenState extends State<_HomeScreen> {
     bool enabled, {
     bool notificationOpenMicOverride = false,
   }) async {
+    final generation = _connectionGeneration;
+    if (!mounted) return;
     setState(() {
       _muted = !enabled;
       _notificationOpenMicOverride = enabled
@@ -1237,21 +1540,23 @@ class _HomeScreenState extends State<_HomeScreen> {
           : false;
       if (_muted) _pttActive = false;
     });
+    _pttAvailable.value = enabled && _connected && !_transferring;
     if (!enabled) {
       await _audio.stopMic();
     } else if (_connected || _localAudioTest) {
       await _subscribeMicPackets();
       final allowed = await _audio.requestMicPermission();
+      if (!mounted || generation != _connectionGeneration) return;
       if (allowed) await _audio.startMic();
       if (!allowed) {
-        _showToast(
-          'Microphone permission was denied. You can still listen and use chat.',
-        );
+        _showToast(_l.micDenied);
       } else if (_audio.state.lastError.isNotEmpty) {
         _showToast(_humanReadableAudioError(_audio.state.lastError));
       }
     }
     if (!mounted) return;
+    _pttAvailable.value =
+        !_muted && _connected && !_transferring && _audio.state.micRunning;
     setState(() => _diagnostics = _withAudioState(_diagnostics));
     await _updateCallNotification();
   }
@@ -1259,9 +1564,7 @@ class _HomeScreenState extends State<_HomeScreen> {
   Future<void> _setSpeakerphone(bool enabled) async {
     final applied = await _audio.setSpeakerphone(enabled);
     if (!mounted) return;
-    final message = applied
-        ? _audio.state.lastError
-        : 'This device could not switch audio output.';
+    final message = applied ? _audio.state.lastError : _l.routeError;
     setState(() {
       _diagnostics = _withAudioState(_diagnostics).copyWith(
         speakerphoneEnabled: applied && enabled,
@@ -1300,9 +1603,7 @@ class _HomeScreenState extends State<_HomeScreen> {
       );
     });
     if (!micAllowed) {
-      _showToast(
-        'Microphone permission was denied. You can still listen and use chat.',
-      );
+      _showToast(_l.micDenied);
     } else if (!micStarted && _audio.state.lastError.isNotEmpty) {
       _showToast(_humanReadableAudioError(_audio.state.lastError));
     } else if (!playbackStarted && _audio.state.lastError.isNotEmpty) {
@@ -1333,9 +1634,11 @@ class _HomeScreenState extends State<_HomeScreen> {
   Future<void> _startCallNotification() async {
     if (!_connected) return;
     await _notification.requestPermission();
+    if (!mounted || !_connected) return;
     await _notification.start(
       server: _callNotificationServer(),
-      status: _micStatusText(),
+      status: _transferring ? _l.changingServer : _micStatusText(),
+      labels: _notificationLabels(),
       muted: _muted,
       speaker: _diagnostics.speakerphoneEnabled,
     );
@@ -1346,7 +1649,8 @@ class _HomeScreenState extends State<_HomeScreen> {
     _notificationTransientTimer?.cancel();
     await _notification.update(
       server: _callNotificationServer(),
-      status: _micStatusText(),
+      status: _transferring ? _l.changingServer : _micStatusText(),
+      labels: _notificationLabels(),
       muted: _muted,
       speaker: _diagnostics.speakerphoneEnabled,
       transientStatus: transientStatus,
@@ -1358,6 +1662,22 @@ class _HomeScreenState extends State<_HomeScreen> {
       });
     }
   }
+
+  Map<String, String> _notificationLabels() => {
+    'title': _callNotificationServer().isEmpty
+        ? _l.notificationVoiceTitle
+        : _l.notificationTitle(_callNotificationServer()),
+    'voiceActive': _l.voiceActive,
+    'mute': _l.mute,
+    'unmute': _l.unmute,
+    'earpiece': _l.earpiece,
+    'speaker': _l.speaker,
+    'chat': _l.chat,
+    'replyHint': _l.writeMessage,
+    'hangUp': _l.hangUp,
+    'channel': _l.notificationChannel,
+    'channelDescription': _l.notificationChannelDescription,
+  };
 
   String _callNotificationServer() {
     final server = _diagnostics.serverUrl.trim();
@@ -1379,21 +1699,21 @@ class _HomeScreenState extends State<_HomeScreen> {
   }
 
   String _micStatusText() {
-    if (_muted) return 'Mic muted';
+    if (_muted) return _l.micMuted;
     if (!_diagnostics.micPermissionGranted) {
-      return 'Microphone permission needed';
+      return _l.micPermissionNeeded;
     }
     if (_diagnostics.micRunning) {
-      return _effectiveOpenMic ? 'Open mic on' : 'Push to talk ready';
+      return _effectiveOpenMic ? _l.openMicOn : _l.pttReady;
     }
-    return 'Mic is not capturing';
+    return _l.micNotCapturing;
   }
 
   bool get _effectiveOpenMic => _openMic || _notificationOpenMicOverride;
 
   String _displayUsername() {
     final username = _usernameController.text.trim();
-    return username.isEmpty ? 'user' : username;
+    return username.isEmpty ? _l.user : username;
   }
 
   String _localAudioStatusText() {
@@ -1402,69 +1722,64 @@ class _HomeScreenState extends State<_HomeScreen> {
     }
     if (_diagnostics.state == AppConnectionState.degraded &&
         !_diagnostics.micPermissionGranted) {
-      return 'Microphone permission was denied. You can still listen and use '
-          'chat.';
+      return _l.micDenied;
     }
-    return _localAudioActive
-        ? 'Audio test is playing your microphone back.'
-        : 'Waiting for microphone audio...';
+    return _localAudioActive ? _l.audioTestActive : _l.waitingMic;
   }
 
   String _connectionStatusText() {
+    if (_transferring) return _l.changingServer;
     switch (_diagnostics.state) {
       case AppConnectionState.idle:
-        return 'Ready to connect';
+        return _l.ready;
       case AppConnectionState.connecting:
-        return 'Connecting to server...';
+        return _l.connectingStatus;
       case AppConnectionState.transferring:
-        return 'Changing server';
+        return _l.changingServer;
       case AppConnectionState.authenticated:
-        return 'Signed in';
+        return _l.signedIn;
       case AppConnectionState.connected:
-        return 'Connected';
+        return _l.connected;
       case AppConnectionState.degraded:
-        return 'Connected, but audio needs attention';
+        return _l.audioAttention;
       case AppConnectionState.fatalError:
-        return 'Could not connect';
+        return _l.couldNotConnect;
       case AppConnectionState.disconnected:
-        return 'Disconnected';
+        return _l.disconnected;
     }
   }
 
   String _playbackStatusText() {
-    return _diagnostics.playbackRunning
-        ? 'Audio playback on'
-        : 'Audio playback off';
+    return _diagnostics.playbackRunning ? _l.playbackOn : _l.playbackOff;
   }
 
   String _audioRouteText() {
     switch (_diagnostics.audioRoute) {
       case 'speaker':
-        return 'Speaker';
+        return _l.speaker;
       case 'normal':
-        return 'Phone earpiece';
+        return _l.earpiece;
       default:
-        return 'Audio route unavailable';
+        return _l.routeUnavailable;
     }
   }
 
   String _humanReadableAudioError(String message) {
     final lower = message.toLowerCase();
     if (lower.contains('permission') && lower.contains('denied')) {
-      return 'Microphone permission was denied. You can still listen and use '
-          'chat.';
+      return _l.micDenied;
     }
     if (lower.contains('microphone capture failed')) {
-      return 'Could not start the microphone.';
+      return _l.micStartError;
     }
     if (lower.contains('microphone read failed')) {
-      return 'Microphone stopped unexpectedly.';
+      return _l.micReadError;
     }
     if (lower.contains('pcm playback failed')) {
-      return 'Could not play voice audio.';
+      return _l.playbackError;
     }
     if (lower.contains('audio route')) {
-      return 'This device could not switch audio output.';
+      return _l.routeError;
     }
     return message;
   }
@@ -1476,23 +1791,21 @@ class _HomeScreenState extends State<_HomeScreen> {
       children: [
         IconButton.filledTonal(
           key: key,
-          tooltip: selected ? 'Use phone earpiece' : 'Use speaker',
+          tooltip: selected ? _l.useEarpiece : _l.useSpeaker,
           isSelected: selected,
           selectedIcon: const Icon(Icons.volume_up),
           icon: const Icon(Icons.volume_up_outlined),
           style: IconButton.styleFrom(
             backgroundColor: selected
-                ? const Color(0xFF55C055)
-                : const Color(0xFFE8ECDC),
-            foregroundColor: const Color(0xFF102010),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+                ? const Color(0xFF326F20)
+                : const Color(0xFF666666),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
           ),
           onPressed: () => _setSpeakerphone(!selected),
         ),
         const SizedBox(height: 4),
-        const Text('Speaker'),
+        Text(_l.speaker),
       ],
     );
   }
@@ -1509,96 +1822,65 @@ class _StatusLine extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
-        color: Color(0xFFE8ECDC),
-        border: Border(bottom: BorderSide(color: Color(0xFFD5D9C8))),
+        color: Color(0xFFD4D4D4),
+        border: Border(bottom: BorderSide(color: Color(0xFF929292))),
       ),
       child: Text(text),
     );
   }
 }
 
-class _PushToTalkOverlay extends StatefulWidget {
+class _PushToTalkOverlay extends StatelessWidget {
   const _PushToTalkOverlay({
     required this.onTalkingChanged,
     required this.available,
   });
-
-  final ValueNotifier<bool> available;
-
   final ValueChanged<bool> onTalkingChanged;
-
-  @override
-  State<_PushToTalkOverlay> createState() => _PushToTalkOverlayState();
-}
-
-class _PushToTalkOverlayState extends State<_PushToTalkOverlay> {
-  bool _talking = false;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.available.addListener(_availabilityChanged);
-  }
-
-  void _availabilityChanged() {
-    if (!widget.available.value) _setTalking(false);
-  }
-
-  @override
-  void dispose() {
-    widget.available.removeListener(_availabilityChanged);
-    super.dispose();
-  }
-
-  void _setTalking(bool talking) {
-    talking = talking && widget.available.value;
-    if (_talking == talking) return;
-    setState(() => _talking = talking);
-    widget.onTalkingChanged(talking);
-  }
+  final ValueNotifier<bool> available;
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Dialog.fullscreen(
-      child: SafeArea(
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Back'),
+      child: DirtBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.arrow_back),
+                  label: Text(l.back),
+                ),
               ),
-            ),
-            Expanded(
-              child: GestureDetector(
-                key: const Key('pttHoldZone'),
-                onTapDown: (_) => _setTalking(true),
-                onTapUp: (_) => _setTalking(false),
-                onTapCancel: () => _setTalking(false),
-                child: Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.all(16),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: _talking
-                        ? const Color(0xFF55C055)
-                        : const Color(0xFF8E6308),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _talking ? 'You are talking' : 'Your mic is off',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(
+                  l.holdToTalk,
+                  textAlign: TextAlign.center,
+                  style: pixelHeading.copyWith(color: Colors.white),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: BeveledPanel(
+                    child: HoldToTalk(
+                      key: const Key('pttHoldZone'),
+                      available: available,
+                      enabled: true,
+                      label: l.micOff,
+                      talkingLabel: l.talking,
+                      hint: l.pttAccessibleHint,
+                      onTalkingChanged: onTalkingChanged,
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

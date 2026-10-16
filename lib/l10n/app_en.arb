@@ -1,0 +1,143 @@
+{
+  "@@locale": "en",
+  "joinTitle": "Join Simple Voice Chat",
+  "server": "Server",
+  "username": "Username",
+  "password": "Password",
+  "join": "Join",
+  "leave": "Leave",
+  "connecting": "Connecting",
+  "cancel": "Cancel",
+  "language": "Language",
+  "systemLanguage": "System",
+  "rememberPassword": "Remember password",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password",
+  "testAudio": "Test audio",
+  "stopAudioTest": "Stop audio test",
+  "voice": "Voice",
+  "chat": "Chat",
+  "microphone": "Microphone",
+  "mute": "Mute",
+  "unmute": "Unmute",
+  "muted": "Muted",
+  "unmuted": "Unmuted",
+  "openMic": "Open mic",
+  "pttOnly": "Disable for push to talk only",
+  "transmitMode": "Transmit Mode",
+  "pushToTalk": "Push to talk",
+  "holdToTalk": "Hold to Talk",
+  "fullscreenPtt": "Fullscreen PTT",
+  "back": "Back",
+  "talking": "You are talking",
+  "micOff": "Your mic is off",
+  "pttAccessibleHint": "Hold to talk. With a screen reader, activate to start or stop talking.",
+  "speaker": "Speaker",
+  "earpiece": "Phone earpiece",
+  "useSpeaker": "Use speaker",
+  "useEarpiece": "Use phone earpiece",
+  "output": "Audio output",
+  "routeUnavailable": "Audio route unavailable",
+  "diagnostics": "Diagnostics",
+  "diagnosticsHint": "Technical details are shown in English.",
+  "inVoiceChat": "Currently in voicechat",
+  "connectedAs": "Connected as {username}",
+  "@connectedAs": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
+  "usernameValue": "Username {username}",
+  "@usernameValue": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
+  "microphoneValue": "Microphone: {status}",
+  "@microphoneValue": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "playbackValue": "Playback: {status} · {route}",
+  "@playbackValue": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      },
+      "route": {
+        "type": "String"
+      }
+    }
+  },
+  "serverChat": "Server chat",
+  "writeMessage": "Write a message",
+  "send": "Send",
+  "messageSent": "Message sent",
+  "ready": "Ready to connect",
+  "connectingStatus": "Connecting to server...",
+  "signedIn": "Signed in",
+  "connected": "Connected",
+  "changingServer": "Changing server",
+  "transferHint": "Voice and chat will resume when the next server is ready.",
+  "audioAttention": "Connected, but audio needs attention",
+  "couldNotConnect": "Could not connect",
+  "disconnected": "Disconnected",
+  "micMuted": "Mic muted",
+  "micPermissionNeeded": "Microphone permission needed",
+  "openMicOn": "Open mic on",
+  "pttReady": "Push to talk ready",
+  "micNotCapturing": "Mic is not capturing",
+  "playbackOn": "Audio playback on",
+  "playbackOff": "Audio playback off",
+  "audioTestActive": "Audio test is playing your microphone back.",
+  "waitingMic": "Waiting for microphone audio...",
+  "serverRequired": "Please provide a valid server address",
+  "usernameRequired": "Please enter a valid username",
+  "passwordRequired": "Please enter your password",
+  "portWarning": "That looks like the minecraft server port. Use the SimpleVoice-Geyser port instead.",
+  "invalidAddress": "That server address does not look valid.",
+  "addressScheme": "Use an http or https server address.",
+  "invalidDiscovery": "The server's SimpleVoice-Geyser app information is invalid.",
+  "earlyClose": "The server closed the connection before voice chat could start. Check that you are using the SimpleVoice-Geyser web port, not the Minecraft server port.",
+  "secureConnectionError": "Could not establish a secure connection. Use the HTTPS address for your SimpleVoice-Geyser web server, or enter http:// only for trusted local testing.",
+  "connectionError": "Could not connect to the server. Check the address and that SimpleVoice-Geyser is running.",
+  "loginRejected": "The server rejected the login. Check the username and password.",
+  "updateRequired": "This app version is not compatible with this server. Update the app.",
+  "joinTimeout": "Connected to the server, but the app did not receive the login confirmation. Please try again.",
+  "serverDisconnected": "The server disconnected you: {reason}",
+  "@serverDisconnected": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "unsupportedAudio": "This server sent an audio format the app cannot play yet.",
+  "micDenied": "Microphone permission was denied. You can still listen and use chat.",
+  "micStartError": "Could not start the microphone.",
+  "micReadError": "Microphone stopped unexpectedly.",
+  "playbackError": "Could not play voice audio.",
+  "routeError": "This device could not switch audio output.",
+  "notificationTitle": "Connected to {server}",
+  "@notificationTitle": {
+    "placeholders": {
+      "server": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationVoiceTitle": "Connected to voice chat",
+  "voiceActive": "Voice chat active",
+  "hangUp": "Hang up",
+  "notificationChannel": "Voice chat",
+  "notificationChannelDescription": "Active Svg-App call controls",
+  "languageSaveError": "Could not save the language preference.",
+  "user": "user"
+}
