@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'packets.dart';
+
 typedef DiscoveryFetcher = Future<String?> Function(Uri uri);
 
 const minecraftServerPortWarning =
@@ -30,6 +32,53 @@ Future<Uri> websocketUriForServerWithDiscovery(
   final body = await fetcher(discoveryUri);
   if (body == null) return websocketUriForServer(input);
   return _websocketUriFromDiscovery(body);
+}
+
+bool isNetworkDownError(Object error) {
+  final text = error.toString().toLowerCase();
+  return text.contains('failed host lookup') ||
+      text.contains('network is unreachable');
+}
+
+// Two fixed public IPs on 443; a network that blocks both reads as offline, so add hosts if that misfires.
+Future<bool> internetReachable() async {
+  for (final host in const ['1.1.1.1', '8.8.8.8']) {
+    try {
+      final socket = await Socket.connect(
+        host,
+        443,
+        timeout: const Duration(seconds: 2),
+      );
+      socket.destroy();
+      return true;
+    } on Object {
+      continue;
+    }
+  }
+  return false;
+}
+
+Future<String?> discoverServerVersion(
+  Uri websocketUri, {
+  DiscoveryFetcher? fetchPage,
+}) async {
+  final segments = websocketUri.pathSegments;
+  if (segments.isEmpty || segments.last != 'ws') return null;
+  final root = segments.sublist(0, segments.length - 1);
+  final page = Uri(
+    scheme: websocketUri.scheme == 'wss' ? 'https' : 'http',
+    host: websocketUri.host,
+    port: websocketUri.hasPort ? websocketUri.port : null,
+    path: root.isEmpty ? '/' : '/${root.join('/')}/',
+  );
+  try {
+    final body = await (fetchPage ?? _fetchDiscovery)(
+      page,
+    ).timeout(const Duration(seconds: 3));
+    return body == null ? null : parseProjectVersion(body);
+  } on Object {
+    return null;
+  }
 }
 
 Uri parseServerBaseUri(String input) {

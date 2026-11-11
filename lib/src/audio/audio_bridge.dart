@@ -2,6 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
+class AudioCodecSupport {
+  const AudioCodecSupport({this.encoder = false, this.decoder = false});
+
+  final bool encoder;
+  final bool decoder;
+}
+
 class AudioBridgeState {
   const AudioBridgeState({
     this.micPermissionGranted = false,
@@ -43,6 +50,14 @@ class AudioBridgeState {
 }
 
 abstract interface class AudioBridge {
+  Future<AudioCodecSupport> prepareCodecs();
+  Future<Uint8List?> encodeOpus(
+    Uint8List pcm, {
+    required int generation,
+    required int timestampUs,
+  });
+  Future<Uint8List> decodeOpus(Uint8List packet, {required int channels});
+  Future<void> resetCodecs();
   Stream<Uint8List> get micPackets;
   AudioBridgeState get state;
 
@@ -59,18 +74,60 @@ abstract interface class AudioBridge {
 }
 
 class NativeAudioBridge implements AudioBridge {
-  NativeAudioBridge({
-    MethodChannel? methodChannel,
-    EventChannel? eventChannel,
-  })  : _methodChannel = methodChannel ??
-            const MethodChannel('simple_voice_app/audio'),
-        _eventChannel = eventChannel ??
-            const EventChannel('simple_voice_app/mic');
+  NativeAudioBridge({MethodChannel? methodChannel, EventChannel? eventChannel})
+    : _methodChannel =
+          methodChannel ?? const MethodChannel('simple_voice_app/audio'),
+      _eventChannel =
+          eventChannel ?? const EventChannel('simple_voice_app/mic');
 
   final MethodChannel _methodChannel;
   final EventChannel _eventChannel;
   AudioBridgeState _state = const AudioBridgeState();
   Stream<Uint8List>? _micPackets;
+
+  @override
+  Future<AudioCodecSupport> prepareCodecs() async {
+    try {
+      final result = await _methodChannel.invokeMapMethod<String, Object?>(
+        'prepareCodecs',
+      ).timeout(const Duration(seconds: 3));
+      return AudioCodecSupport(
+        encoder: result?['encoder'] == true,
+        decoder: result?['decoder'] == true,
+      );
+    } on MissingPluginException {
+      return const AudioCodecSupport();
+    } on PlatformException {
+      return const AudioCodecSupport();
+    } on TimeoutException {
+      return const AudioCodecSupport();
+    }
+  }
+
+  @override
+  Future<Uint8List?> encodeOpus(
+    Uint8List pcm, {
+    required int generation,
+    required int timestampUs,
+  }) => _methodChannel.invokeMethod<Uint8List>('encodeOpus', {
+    'bytes': pcm,
+    'generation': generation,
+    'timestampUs': timestampUs,
+  });
+
+  @override
+  Future<Uint8List> decodeOpus(
+    Uint8List packet, {
+    required int channels,
+  }) async =>
+      await _methodChannel.invokeMethod<Uint8List>('decodeOpus', {
+        'bytes': packet,
+        'channels': channels,
+      }) ??
+      Uint8List(0);
+
+  @override
+  Future<void> resetCodecs() => _voidCall('resetCodecs');
 
   @override
   AudioBridgeState get state => _state;
@@ -139,10 +196,7 @@ class NativeAudioBridge implements AudioBridge {
   Future<void> playPcm16(Uint8List bytes, {required int channels}) async {
     if (bytes.isEmpty) return;
     final safeChannels = channels == 2 ? 2 : 1;
-    await _voidCall('playPcm16', {
-      'bytes': bytes,
-      'channels': safeChannels,
-    });
+    await _voidCall('playPcm16', {'bytes': bytes, 'channels': safeChannels});
   }
 
   @override
@@ -180,6 +234,7 @@ class NativeAudioBridge implements AudioBridge {
 
   @override
   Future<void> resetAudio() async {
+    await resetCodecs();
     await _voidCall('resetAudio');
     _state = const AudioBridgeState();
   }

@@ -5,7 +5,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show LicenseRegistry, LicenseEntryWithLineBreaks;
-import 'package:flutter/services.dart' show rootBundle, SystemUiOverlayStyle;
+import 'package:flutter/services.dart'
+    show rootBundle, SystemUiOverlayStyle, PlatformException;
 
 import 'l10n/generated/app_localizations.dart';
 
@@ -40,6 +41,7 @@ const _joinConfirmationTimeoutMessage =
     'Connected to the server, but the app did not receive the login '
     'confirmation. Please try again.';
 const _micDiagnosticsBatchSize = 25;
+const _silentCodecFrames = 50;
 
 enum _JoinField { server, username, password }
 
@@ -50,6 +52,7 @@ class SimpleVoiceApp extends StatefulWidget {
     this.audioBridge,
     this.notificationBridge,
     this.clientFactory,
+    this.internetProbe = internetReachable,
     this.showOpeningSplash = true,
     this.credentialStore,
   });
@@ -58,6 +61,7 @@ class SimpleVoiceApp extends StatefulWidget {
   final AudioBridge? audioBridge;
   final CallNotificationBridge? notificationBridge;
   final SimpleVoiceClientFactory? clientFactory;
+  final Future<bool> Function() internetProbe;
   final bool showOpeningSplash;
   final CredentialStore? credentialStore;
 
@@ -85,9 +89,7 @@ class _SimpleVoiceAppState extends State<SimpleVoiceApp> {
       )) {
         setState(() => _language = language);
       }
-    } catch (_) {
-      // Device language remains usable when secure storage is unavailable.
-    }
+    } catch (_) {}
   }
 
   Future<void> _changeLanguage(String? language) async {
@@ -95,9 +97,7 @@ class _SimpleVoiceAppState extends State<SimpleVoiceApp> {
     setState(() => _language = language);
     try {
       await _store.saveLanguage(language);
-    } catch (_) {
-      // The current session can still use the selected language.
-    }
+    } catch (_) {}
   }
 
   @override
@@ -128,6 +128,7 @@ class _SimpleVoiceAppState extends State<SimpleVoiceApp> {
           audioBridge: widget.audioBridge,
           notificationBridge: widget.notificationBridge,
           clientFactory: widget.clientFactory,
+          internetProbe: widget.internetProbe,
           store: _store,
           language: _language,
           onLanguageChanged: _changeLanguage,
@@ -263,6 +264,7 @@ class _HomeScreen extends StatefulWidget {
     this.audioBridge,
     this.notificationBridge,
     this.clientFactory,
+    required this.internetProbe,
     required this.store,
     required this.language,
     required this.onLanguageChanged,
@@ -272,6 +274,7 @@ class _HomeScreen extends StatefulWidget {
   final AudioBridge? audioBridge;
   final CallNotificationBridge? notificationBridge;
   final SimpleVoiceClientFactory? clientFactory;
+  final Future<bool> Function() internetProbe;
   final CredentialStore store;
   final String? language;
   final ValueChanged<String?> onLanguageChanged;
@@ -288,6 +291,22 @@ class _HomeScreenState extends State<_HomeScreen> {
   bool _transferring = false;
   bool _pttOverlayOpen = false;
   int _connectionGeneration = 0;
+  int _micGeneration = 0;
+  int _audioGeneration = 0;
+  bool _micReady = false;
+  bool _encodingMic = false;
+  int _pendingAudioFrames = 0;
+  Future<void> _audioQueue = Future.value();
+  String _selectedMicFormat = 'pcm16le';
+  AudioCodecSupport _codecSupport = const AudioCodecSupport();
+  final _audioClock = Stopwatch()..start();
+  Timer? _negotiationTimer;
+  Timer? _reconnectTimer;
+  Timer? _diagnosticsRefresh;
+  int _reconnectAttempts = 0;
+  bool _reconnecting = false;
+  bool _fatalSeen = false;
+  int _emptyEncodes = 0;
   final _pttAvailable = ValueNotifier<bool>(true);
   bool _notificationOpenMicOverride = false;
   bool _localAudioTest = false;
@@ -410,6 +429,11 @@ class _HomeScreenState extends State<_HomeScreen> {
   @override
   void dispose() {
     ++_connectionGeneration;
+    ++_audioGeneration;
+    ++_micGeneration;
+    _negotiationTimer?.cancel();
+    _reconnectTimer?.cancel();
+    _diagnosticsRefresh?.cancel();
     _pttAvailable.dispose();
     _joinConfirmationTimer?.cancel();
     _notificationTransientTimer?.cancel();
@@ -444,9 +468,7 @@ class _HomeScreenState extends State<_HomeScreen> {
         _rememberPassword = saved.password.isNotEmpty;
         _showMinecraftPortWarning = hasMinecraftServerPort(saved.serverUrl);
       });
-    } catch (_) {
-      // Keep manual sign-in available when saved credentials cannot be read.
-    }
+    } catch (_) {}
   }
 
   void _updateServerPortWarning(String value) {
@@ -884,6 +906,7 @@ class _HomeScreenState extends State<_HomeScreen> {
         subtitle: Text(_l.pttOnly),
         value: _openMic,
         onChanged: (value) {
+          ++_micGeneration;
           setState(() {
             _openMic = value;
             _pttActive = false;
@@ -901,10 +924,7 @@ class _HomeScreenState extends State<_HomeScreen> {
           label: _l.holdToTalk,
           talkingLabel: _l.talking,
           hint: _l.pttAccessibleHint,
-          onTalkingChanged: (talking) => setState(
-            () =>
-                _pttActive = talking && !_transferring && _connected && !_muted,
-          ),
+          onTalkingChanged: _setPttActive,
         ),
         const SizedBox(height: 8),
       ],
@@ -990,7 +1010,15 @@ class _HomeScreenState extends State<_HomeScreen> {
     ],
   );
 
+  void _setPttActive(bool talking) {
+    ++_micGeneration;
+    setState(
+      () => _pttActive = talking && !_transferring && _connected && !_muted,
+    );
+  }
+
   void _showPtt() {
+    ++_micGeneration;
     if (!_connected || _transferring) return;
     final previousOpenMic = _openMic;
     final previousMuted = _muted;
@@ -1010,7 +1038,7 @@ class _HomeScreenState extends State<_HomeScreen> {
         available: _pttAvailable,
         onTalkingChanged: (talking) {
           if (!mounted) return;
-          setState(() => _pttActive = talking && !_transferring && _connected);
+          _setPttActive(talking);
         },
       ),
     ).whenComplete(() {
@@ -1030,6 +1058,12 @@ class _HomeScreenState extends State<_HomeScreen> {
     await _audio.refreshAudioDebugInfo();
     if (!mounted) return;
     setState(() => _diagnostics = _withAudioState(_diagnostics));
+    final tick = ValueNotifier<int>(0);
+    _diagnosticsRefresh?.cancel();
+    _diagnosticsRefresh = Timer.periodic(const Duration(seconds: 1), (_) {
+      _flushMicPacketDiagnostics();
+      tick.value++;
+    });
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -1048,16 +1082,30 @@ class _HomeScreenState extends State<_HomeScreen> {
                 const SizedBox(height: 12),
                 Text(_l.diagnosticsHint),
                 const SizedBox(height: 16),
-                SelectableText(_diagnostics.redactedText()),
+                ListenableBuilder(
+                  listenable: tick,
+                  builder: (_, _) => SelectableText(
+                    _withAudioState(_diagnostics).redactedText(),
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      _diagnosticsRefresh?.cancel();
+      tick.dispose();
+    });
   }
 
-  Future<void> _connect() async {
+  Future<void> _connect({bool automatic = false}) async {
+    _reconnectTimer?.cancel();
+    if (!automatic) {
+      _reconnecting = false;
+      _reconnectAttempts = 0;
+    }
+    _fatalSeen = false;
     final generation = ++_connectionGeneration;
     final server = _serverController.text.trim();
     final username = _usernameController.text.trim();
@@ -1092,6 +1140,16 @@ class _HomeScreenState extends State<_HomeScreen> {
         ),
       );
 
+      final discoveredVersion = await discoverServerVersion(websocketUri);
+      if (!mounted || generation != _connectionGeneration) return;
+      final codecSupport = await _audio.prepareCodecs();
+      if (!mounted || generation != _connectionGeneration) return;
+      _codecSupport = codecSupport;
+      _incomingAudio.emptyOpusDecodes = 0;
+      _emptyEncodes = 0;
+      _micReady = false;
+      ++_micGeneration;
+      ++_audioGeneration;
       final client = widget.clientFactory == null
           ? SimpleVoiceClient(websocketUri)
           : widget.clientFactory!(websocketUri);
@@ -1104,11 +1162,15 @@ class _HomeScreenState extends State<_HomeScreen> {
           websocketUrl: websocketText,
           state: AppConnectionState.connecting,
           selectedAudioMode: 'legacy',
+          decoderStatus: _codecSupport.decoder
+              ? 'Native Opus ready'
+              : 'Native Opus unavailable',
         );
       });
       await client.connect(
         username: username,
         password: password,
+        discoveredVersion: discoveredVersion,
         onJoinAttempt: () {
           if (mounted && generation == _connectionGeneration) {
             _startJoinConfirmationTimer();
@@ -1129,19 +1191,31 @@ class _HomeScreenState extends State<_HomeScreen> {
     } catch (error) {
       if (!mounted || generation != _connectionGeneration) return;
       _joinConfirmationTimer?.cancel();
-      final message = _humanReadableConnectionError(error);
-      if (!mounted) return;
+      final message = isNetworkDownError(error) && !await widget.internetProbe()
+          ? _l.noInternet
+          : _humanReadableConnectionError(error);
+      if (!mounted || generation != _connectionGeneration) return;
+      final retry =
+          _reconnecting &&
+          shouldReconnect(closeCode: null, attempts: _reconnectAttempts);
       setState(() {
         _busy = false;
         _connected = false;
         _diagnostics = DiagnosticsSnapshot(
           serverUrl: server,
           websocketUrl: websocketText,
-          state: AppConnectionState.fatalError,
+          state: retry
+              ? AppConnectionState.disconnected
+              : AppConnectionState.fatalError,
           lastCloseReason: message,
         );
       });
-      _showToast(message);
+      if (retry) {
+        _scheduleReconnect();
+      } else {
+        _reconnecting = false;
+        _showToast(message);
+      }
     }
   }
 
@@ -1150,6 +1224,8 @@ class _HomeScreenState extends State<_HomeScreen> {
     final type = controlPacketType(packet);
     final message = controlPacketMessage(packet);
     var becameConnected = false;
+    var resumedTransfer = false;
+    if (isFatalServerError(packet)) _fatalSeen = true;
     setState(() {
       if (type == 'chat' ||
           type == 'info' ||
@@ -1163,10 +1239,13 @@ class _HomeScreenState extends State<_HomeScreen> {
         _busy = false;
         becameConnected = !_connected;
         if (becameConnected) {
+          _reconnecting = false;
+          _reconnectAttempts = 0;
           _localAudioTest = false;
           _localAudioActive = false;
         }
         final wasTransferring = _transferring;
+        resumedTransfer = wasTransferring;
         _connected = true;
         _transferring = false;
         _pttAvailable.value = !_muted && _diagnostics.micRunning;
@@ -1182,6 +1261,11 @@ class _HomeScreenState extends State<_HomeScreen> {
           );
         }
       } else if (_connected && isTransferStatusPacket(packet)) {
+        ++_micGeneration;
+        ++_audioGeneration;
+        _micReady = false;
+        _negotiationTimer?.cancel();
+        unawaited(_audio.resetCodecs());
         _transferring = true;
         _pttActive = false;
         _pttAvailable.value = false;
@@ -1196,7 +1280,16 @@ class _HomeScreenState extends State<_HomeScreen> {
           lastCloseReason: message,
         );
       } else if (type == 'capabilities_ack') {
+        _negotiationTimer?.cancel();
+        final format = packet['selectedMicFormat'];
+        _selectedMicFormat = format == 'opus' ? 'opus' : 'pcm16le';
+        _micReady =
+            (format == null ||
+            format == 'pcm16le' ||
+            (format == 'opus' && _codecSupport.encoder));
+        ++_micGeneration;
         _diagnostics = _diagnostics.copyWith(
+          selectedMicFormat: _selectedMicFormat,
           selectedAudioMode: selectedAudioModeFromCapabilitiesAck(packet),
         );
       } else if (type == 'chat') {
@@ -1206,29 +1299,127 @@ class _HomeScreenState extends State<_HomeScreen> {
       }
     });
     if (type == 'error') _showToast(_humanReadableServerError(message));
+    if (type == 'capabilities_ack' && !_micReady) {
+      _showToast(_l.opusMicUnavailable);
+    }
+    if (type == 'capabilities_ack' &&
+        packet['selectedMode'] == 'svg-v2' &&
+        !_codecSupport.decoder) {
+      _showToast(_l.unsupportedAudio);
+    }
     if (becameConnected) {
-      _client?.sendCapabilities();
+      _advertiseCodecs();
       unawaited(_startConnectedAudio());
     } else if (_connected) {
+      if (resumedTransfer && !_micReady) _startAudioNegotiationTimer();
       unawaited(_updateCallNotification());
     }
   }
 
+  void _advertiseCodecs({bool renegotiate = false}) {
+    _emptyEncodes = 0;
+    _micReady = false;
+    ++_micGeneration;
+    _startAudioNegotiationTimer();
+    _client?.sendCapabilities(
+      opusEncoder: _codecSupport.encoder,
+      opusDecoder: _codecSupport.decoder,
+      renegotiate: renegotiate,
+    );
+  }
+
+  void _withdrawDecoder() {
+    _codecSupport = AudioCodecSupport(encoder: _codecSupport.encoder);
+    setState(
+      () => _diagnostics = _diagnostics.copyWith(
+        decoderStatus: 'Native Opus failed; legacy requested',
+      ),
+    );
+    _advertiseCodecs(renegotiate: true);
+    _showToast(_l.unsupportedAudio);
+  }
+
+  void _withdrawEncoder() {
+    _codecSupport = AudioCodecSupport(decoder: _codecSupport.decoder);
+    _advertiseCodecs(renegotiate: true);
+    _showToast(_l.opusMicFailed);
+  }
+
+  void _scheduleReconnect() {
+    const delays = [2, 4, 8, 15, 15];
+    _reconnecting = true;
+    final delay = Duration(seconds: delays[_reconnectAttempts]);
+    _reconnectAttempts++;
+    _showToast(_l.reconnecting);
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(delay, () {
+      if (mounted) unawaited(_connect(automatic: true));
+    });
+  }
+
+  void _startAudioNegotiationTimer() {
+    _negotiationTimer?.cancel();
+    _negotiationTimer = Timer(const Duration(seconds: 8), () {
+      if (!mounted || !_connected || _transferring || _micReady) return;
+      _showToast(_l.audioNegotiationTimeout);
+    });
+  }
+
   Future<void> _handleAudioFrame(List<int> bytes) async {
-    if (!mounted || !_connected) return;
-    final generation = _connectionGeneration;
-    final unsupportedOpusBefore = _diagnostics.unsupportedOpusFrames;
-    final data = Uint8List.fromList(bytes);
-    final next = await _incomingAudio.handle(data, _diagnostics);
-    if (!mounted || generation != _connectionGeneration || !_connected) return;
-    setState(() => _diagnostics = _withAudioState(next));
-    if (next.unsupportedOpusFrames > unsupportedOpusBefore) {
-      _showToast(_l.unsupportedAudio);
+    if (!mounted || !_connected || _transferring || _pendingAudioFrames >= 4) {
+      return;
+    }
+    final generation = _audioGeneration;
+    final received = _audioClock.elapsedMicroseconds;
+    final previous = _audioQueue;
+    final completed = Completer<void>();
+    _audioQueue = completed.future;
+    bool current() =>
+        mounted &&
+        _connected &&
+        !_transferring &&
+        generation == _audioGeneration;
+    _pendingAudioFrames++;
+    try {
+      await previous;
+      if (!current() || _audioClock.elapsedMicroseconds - received > 150000) {
+        return;
+      }
+      final unsupportedOpusBefore = _diagnostics.unsupportedOpusFrames;
+      final next = await _incomingAudio.handle(
+        Uint8List.fromList(bytes),
+        _diagnostics,
+        opusDecoder: _codecSupport.decoder,
+        isCurrent: current,
+      );
+      if (!current()) return;
+      setState(() => _diagnostics = _withAudioState(next));
+      if (next.unsupportedOpusFrames > unsupportedOpusBefore) {
+        _showToast(_l.unsupportedAudio);
+      }
+      if (_incomingAudio.emptyOpusDecodes >= _silentCodecFrames) {
+        _incomingAudio.emptyOpusDecodes = 0;
+        _withdrawDecoder();
+      }
+    } on PlatformException {
+      if (!current()) return;
+      _withdrawDecoder();
+    } finally {
+      _pendingAudioFrames--;
+      completed.complete();
     }
   }
 
   void _handleClosed(int? code, String reason) {
     if (!mounted) return;
+    final retry =
+        (_connected || _reconnecting) &&
+        !_fatalSeen &&
+        shouldReconnect(closeCode: code, attempts: _reconnectAttempts);
+    ++_audioGeneration;
+    ++_micGeneration;
+    _micReady = false;
+    _negotiationTimer?.cancel();
     ++_connectionGeneration;
     if (_pttOverlayOpen) Navigator.of(context).pop();
     _transferring = false;
@@ -1247,10 +1438,23 @@ class _HomeScreenState extends State<_HomeScreen> {
         lastCloseReason: reason,
       );
     });
+    if (retry) {
+      _scheduleReconnect();
+      return;
+    }
+    final exhausted =
+        _reconnecting && _reconnectAttempts >= maxReconnectAttempts;
+    _reconnecting = false;
     final message =
         code == outdatedClientCloseCode &&
             reason.trim() == appProtocolUnsupportedReason
         ? _l.updateRequired
+        : reason.trim() == unsupportedClientTypeReason
+        ? _l.clientTypeBlocked
+        : isOpusMicrophoneRequired(reason)
+        ? _l.opusMicUnavailable
+        : exhausted
+        ? _l.connectionLost
         : reason.trim().isEmpty
         ? ''
         : _l.serverDisconnected(reason.trim());
@@ -1324,9 +1528,7 @@ class _HomeScreenState extends State<_HomeScreen> {
         password: password,
         rememberPassword: _rememberPassword,
       );
-    } catch (_) {
-      // Credential storage should not block joining a voice server.
-    }
+    } catch (_) {}
   }
 
   String _humanReadableConnectionError(Object error) {
@@ -1366,7 +1568,11 @@ class _HomeScreenState extends State<_HomeScreen> {
   }
 
   String _humanReadableServerError(String message) {
+    if (isOpusMicrophoneRequired(message)) {
+      return _l.opusMicUnavailable;
+    }
     if (message == appProtocolUnsupportedMessage) return _l.updateRequired;
+    if (message == unsupportedClientTypeMessage) return _l.clientTypeBlocked;
     final lower = message.toLowerCase();
     if (const {
       'authentication failed: bad password.',
@@ -1397,6 +1603,12 @@ class _HomeScreenState extends State<_HomeScreen> {
   }
 
   Future<void> _disconnect() async {
+    ++_audioGeneration;
+    ++_micGeneration;
+    _micReady = false;
+    _negotiationTimer?.cancel();
+    _reconnectTimer?.cancel();
+    _reconnecting = false;
     if (_pttOverlayOpen) Navigator.of(context).pop();
     ++_connectionGeneration;
     _connected = false;
@@ -1493,9 +1705,54 @@ class _HomeScreenState extends State<_HomeScreen> {
       openMic: _effectiveOpenMic,
       pttActive: _pttActive,
     );
-    if (!gate.shouldSend(packet)) return;
-    _client?.sendMicPacket(packet);
-    _recordMicPacketSent();
+    if (!gate.shouldSend(packet) || !_micReady) return;
+    if (_selectedMicFormat == 'opus') {
+      unawaited(_sendOpusMic(packet));
+    } else {
+      _client?.sendMicPacket(packet);
+      _recordMicPacketSent();
+    }
+  }
+
+  Future<void> _sendOpusMic(Uint8List pcm) async {
+    if (_encodingMic) return;
+    _encodingMic = true;
+    final generation = _micGeneration;
+    final captured = _audioClock.elapsedMicroseconds;
+    try {
+      final packet = await _audio.encodeOpus(
+        pcm,
+        generation: generation,
+        timestampUs: captured,
+      );
+      if (!mounted ||
+          generation != _micGeneration ||
+          !_connected ||
+          _transferring ||
+          !_micReady ||
+          _muted ||
+          !(_effectiveOpenMic || _pttActive) ||
+          _audioClock.elapsedMicroseconds - captured > 150000) {
+        return;
+      }
+      if (packet == null || packet.isEmpty || packet.lengthInBytes > 1275) {
+        if (++_emptyEncodes >= _silentCodecFrames) _withdrawEncoder();
+        return;
+      }
+      _emptyEncodes = 0;
+      _client?.sendMicPacket(packet);
+      _recordMicPacketSent();
+    } on PlatformException {
+      if (!mounted ||
+          generation != _micGeneration ||
+          !_connected ||
+          _transferring) {
+        return;
+      }
+      _withdrawEncoder();
+    } finally {
+      _encodingMic = false;
+    }
   }
 
   void _recordMicPacketSent() {
@@ -1533,6 +1790,7 @@ class _HomeScreenState extends State<_HomeScreen> {
   }) async {
     final generation = _connectionGeneration;
     if (!mounted) return;
+    ++_micGeneration;
     setState(() {
       _muted = !enabled;
       _notificationOpenMicOverride = enabled

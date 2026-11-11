@@ -30,12 +30,12 @@ class SimpleVoiceClient {
   final VoiceWebSocketConnector _connector;
   VoiceWebSocket? _socket;
   StreamSubscription<dynamic>? _subscription;
-  int _attempts = 0;
   bool _manualClose = false;
   bool _authenticated = false;
   bool _transferring = false;
   bool _capabilitiesSent = false;
   int _generation = 0;
+  List<String> _targets = supportedTargetServerVersions;
 
   Future<void> connect({
     required String username,
@@ -44,13 +44,14 @@ class SimpleVoiceClient {
     required void Function(Uint8List bytes) onAudioFrame,
     required void Function(int? code, String reason) onClosed,
     void Function()? onJoinAttempt,
+    String? discoveredVersion,
   }) async {
     final generation = ++_generation;
+    _targets = serverVersionTargets(discoveredVersion);
     _manualClose = false;
     _authenticated = false;
     _transferring = false;
     _capabilitiesSent = false;
-    _attempts = 0;
     await _connectWithServerVersion(
       username: username,
       password: password,
@@ -136,13 +137,6 @@ class SimpleVoiceClient {
         }
         _authenticated = false;
         onClosed(code, reason);
-        if (shouldReconnect(
-          closeCode: code,
-          attempts: _attempts,
-          manualClose: _manualClose,
-        )) {
-          _attempts++;
-        }
       },
     );
     socket.add(
@@ -150,7 +144,7 @@ class SimpleVoiceClient {
         joinPacket(
           username: username,
           password: password,
-          serverVersion: supportedTargetServerVersions[targetIndex],
+          serverVersion: _targets[targetIndex],
         ),
       ),
     );
@@ -180,7 +174,7 @@ class SimpleVoiceClient {
   }
 
   bool _hasNextServerVersion(int targetIndex) {
-    return targetIndex + 1 < supportedTargetServerVersions.length;
+    return targetIndex + 1 < _targets.length;
   }
 
   void sendChat(String message) {
@@ -188,15 +182,23 @@ class SimpleVoiceClient {
     _socket?.add(jsonEncode(chatPacket(message)));
   }
 
-  void sendCapabilities() {
+  void sendCapabilities({
+    bool opusEncoder = false,
+    bool opusDecoder = false,
+    bool renegotiate = false,
+  }) {
     if (!_authenticated ||
         _transferring ||
-        _capabilitiesSent ||
+        (_capabilitiesSent && !renegotiate) ||
         _socket == null) {
       return;
     }
     _capabilitiesSent = true;
-    _socket?.add(jsonEncode(capabilitiesPacket()));
+    _socket?.add(
+      jsonEncode(
+        capabilitiesPacket(opusEncoder: opusEncoder, opusDecoder: opusDecoder),
+      ),
+    );
   }
 
   void sendMicPacket(Uint8List packet) {

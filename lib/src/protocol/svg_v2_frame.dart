@@ -25,7 +25,7 @@ class SvgV2Frame {
     final data = ByteData.sublistView(bytes);
     final payloadLength = data.getUint32(16, Endian.little);
     final payloadEnd = 20 + payloadLength;
-    if (payloadEnd > bytes.lengthInBytes) {
+    if (payloadEnd != bytes.lengthInBytes) {
       throw const FormatException('svg-v2 payload length exceeds frame size.');
     }
 
@@ -34,14 +34,21 @@ class SvgV2Frame {
       2 => SvgV2Codec.pcm16le,
       _ => throw const FormatException('Unknown svg-v2 codec.'),
     };
+    final channels = data.getUint8(14);
+    if (data.getUint16(12, Endian.little) != 48000 ||
+        (channels != 1 && channels != 2) ||
+        (codec == SvgV2Codec.opus && payloadLength > 1275) ||
+        (codec == SvgV2Codec.pcm16le && payloadLength % (channels * 2) != 0)) {
+      throw const FormatException('Unsupported svg-v2 audio format.');
+    }
 
     return SvgV2Frame(
       flags: data.getUint8(3),
       sequence: data.getUint32(4, Endian.little),
-      pan: data.getInt16(8, Endian.little) / 32768.0,
-      gain: data.getUint16(10, Endian.little) / 32767.0,
+      pan: (data.getInt16(8, Endian.little) / 32767.0).clamp(-1.0, 1.0),
+      gain: (data.getInt16(10, Endian.little) / 32767.0).clamp(0.0, 1.0),
       sampleRate: data.getUint16(12, Endian.little),
-      channels: data.getUint8(14),
+      channels: channels,
       codec: codec,
       payload: Uint8List.sublistView(bytes, 20, payloadEnd),
     );

@@ -24,8 +24,6 @@
   "unmuted": "Unmuted",
   "openMic": "Open mic",
   "pttOnly": "Disable for push to talk only",
-  "transmitMode": "Transmit Mode",
-  "pushToTalk": "Push to talk",
   "holdToTalk": "Hold to Talk",
   "fullscreenPtt": "Fullscreen PTT",
   "back": "Back",
@@ -138,6 +136,12 @@
   "hangUp": "Hang up",
   "notificationChannel": "Voice chat",
   "notificationChannelDescription": "Active Svg-App call controls",
-  "languageSaveError": "Could not save the language preference.",
-  "user": "user"
+  "user": "user",
+  "opusMicUnavailable": "This server requires Opus microphone audio, but a compatible encoder is unavailable on this device.",
+  "audioNegotiationTimeout": "The server did not confirm the microphone format. Reconnect to try again.",
+  "opusMicFailed": "Opus microphone audio failed. Trying PCM where the server allows it.",
+  "reconnecting": "Connection lost. Reconnecting...",
+  "connectionLost": "Connection lost. Could not reconnect to the server.",
+  "noInternet": "No internet connection. Check your Wi-Fi or mobile data and try again.",
+  "clientTypeBlocked": "This server does not allow the Svg-App client."
 }

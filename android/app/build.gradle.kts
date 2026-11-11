@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.simple_voice_app"
+    namespace = "com.svg.svg_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -14,11 +14,16 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.simple_voice_app"
+        applicationId = "com.svg.svg_app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        ndk {
+            // Flutter's defaults also admit plugin libraries for other architectures.
+            abiFilters.clear()
+            abiFilters.add("arm64-v8a")
+        }
     }
 
     buildTypes {

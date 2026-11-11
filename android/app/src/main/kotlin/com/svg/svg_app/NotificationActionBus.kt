@@ -1,4 +1,4 @@
-package com.example.simple_voice_app
+package com.svg.svg_app
 
 import android.os.Handler
 import android.os.Looper

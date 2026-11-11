@@ -1,4 +1,4 @@
-package com.example.simple_voice_app
+package com.svg.svg_app
 
 import android.app.Notification
 import android.app.NotificationChannel

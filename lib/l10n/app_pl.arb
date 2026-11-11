@@ -24,8 +24,6 @@
   "unmuted": "Włączony",
   "openMic": "Otwarty mikrofon",
   "pttOnly": "Wyłącz, aby używać tylko PTT",
-  "transmitMode": "Tryb nadawania",
-  "pushToTalk": "Naciśnij i mów",
   "holdToTalk": "Przytrzymaj, aby mówić",
   "fullscreenPtt": "Tryb pełnoekranowy PTT",
   "back": "Wróć",
@@ -93,6 +91,12 @@
   "hangUp": "Rozłącz",
   "notificationChannel": "Czat głosowy",
   "notificationChannelDescription": "Sterowanie aktywną rozmową Svg-App",
-  "languageSaveError": "Nie udało się zapisać ustawienia języka.",
-  "user": "użytkownik"
+  "user": "użytkownik",
+  "opusMicUnavailable": "Ten serwer wymaga mikrofonu z kodowaniem Opus, ale na tym urządzeniu nie ma zgodnego kodera.",
+  "audioNegotiationTimeout": "Serwer nie potwierdził formatu mikrofonu. Spróbuj połączyć się ponownie.",
+  "opusMicFailed": "Wystąpił błąd mikrofonu Opus. Próba użycia PCM, jeśli serwer na to zezwala.",
+  "reconnecting": "Utracono połączenie. Ponowne łączenie...",
+  "connectionLost": "Utracono połączenie. Nie udało się ponownie połączyć z serwerem.",
+  "noInternet": "Brak połączenia z internetem. Sprawdź Wi-Fi lub dane mobilne i spróbuj ponownie.",
+  "clientTypeBlocked": "Ten serwer nie zezwala na klienta Svg-App."
 }

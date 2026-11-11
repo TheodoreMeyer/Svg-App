@@ -24,8 +24,6 @@
   "unmuted": "Attivo",
   "openMic": "Microfono aperto",
   "pttOnly": "Disattiva per usare solo PTT",
-  "transmitMode": "Modalità di trasmissione",
-  "pushToTalk": "Premere per parlare",
   "holdToTalk": "Tieni premuto per parlare",
   "fullscreenPtt": "PTT a schermo intero",
   "back": "Indietro",
@@ -93,6 +91,12 @@
   "hangUp": "Termina chiamata",
   "notificationChannel": "Chat vocale",
   "notificationChannelDescription": "Controlli della chiamata Svg-App attiva",
-  "languageSaveError": "Impossibile salvare la lingua preferita.",
-  "user": "utente"
+  "user": "utente",
+  "opusMicUnavailable": "Questo server richiede audio del microfono in formato Opus, ma su questo dispositivo non è disponibile un codificatore compatibile.",
+  "audioNegotiationTimeout": "Il server non ha confermato il formato del microfono. Prova a riconnetterti.",
+  "opusMicFailed": "Errore audio del microfono Opus. Tentativo con PCM se consentito dal server.",
+  "reconnecting": "Connessione persa. Riconnessione in corso...",
+  "connectionLost": "Connessione persa. Impossibile riconnettersi al server.",
+  "noInternet": "Nessuna connessione a internet. Controlla il Wi-Fi o i dati mobili e riprova.",
+  "clientTypeBlocked": "Questo server non consente il client Svg-App."
 }

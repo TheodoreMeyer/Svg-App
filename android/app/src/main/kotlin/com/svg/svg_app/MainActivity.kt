@@ -1,4 +1,4 @@
-package com.example.simple_voice_app
+package com.svg.svg_app
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -16,6 +16,10 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.RejectedExecutionException
 
 class MainActivity : FlutterActivity() {
     private val audioChannelName = "simple_voice_app/audio"
@@ -37,6 +41,11 @@ class MainActivity : FlutterActivity() {
     private var speakerphoneRequested = false
     private var lastAudioRouteError = ""
     @Volatile private var micActive = false
+    private val opus = OpusAudio()
+    private val codecWorker = object : ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue<Runnable>(8)) {
+        override fun terminated() { opus.close() }
+    }
+    @Volatile private var codecGeneration = 0
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -46,6 +55,22 @@ class MainActivity : FlutterActivity() {
             audioChannelName
         ).setMethodCallHandler { call, result ->
             when (call.method) {
+                "prepareCodecs" -> codecCall(result) { opus.prepare() }
+                "encodeOpus" -> codecCall(result) {
+                    opus.encode(
+                        requireNotNull(call.argument<ByteArray>("bytes")),
+                        requireNotNull(call.argument<Int>("generation")),
+                        requireNotNull(call.argument<Number>("timestampUs")).toLong()
+                    )
+                }
+                "decodeOpus" -> codecCall(result) {
+                    opus.decode(requireNotNull(call.argument<ByteArray>("bytes")),
+                        call.argument<Int>("channels") ?: 1)
+                }
+                "resetCodecs" -> {
+                    codecGeneration++
+                    codecCall(result) { opus.close(); null }
+                }
                 "requestMicPermission" -> requestMicPermission(result)
                 "startMic" -> result.success(startMic())
                 "stopMic" -> {
@@ -152,6 +177,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         resetAudio()
+        codecWorker.shutdown()
         CallNotificationService.stop(this)
         super.onDestroy()
     }
@@ -423,6 +449,8 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun resetAudio() {
+        codecGeneration++
+        try { codecWorker.execute { opus.close() } } catch (_: RejectedExecutionException) { }
         stopMic()
         stopPlayback()
         speakerphoneRequested = false
@@ -601,5 +629,28 @@ class MainActivity : FlutterActivity() {
 
     private fun reportAudioError(message: String) {
         mainHandler.post { eventSink?.error("audio_error", message, null) }
+    }
+
+    private fun codecCall(result: MethodChannel.Result, action: () -> Any?) {
+        val generation = codecGeneration
+        try {
+            codecWorker.execute {
+                try {
+                    if (generation != codecGeneration) {
+                        opus.close()
+                        throw IllegalStateException("Audio session changed.")
+                    }
+                    val value = action()
+                    mainHandler.post {
+                        if (generation == codecGeneration) result.success(value)
+                        else result.error("codec_cancelled", "Audio session changed.", null)
+                    }
+                } catch (error: Exception) {
+                    mainHandler.post { result.error("codec_error", error.message, null) }
+                }
+            }
+        } catch (_: RejectedExecutionException) {
+            result.error("codec_busy", "Audio queue unavailable.", null)
+        }
     }
 }

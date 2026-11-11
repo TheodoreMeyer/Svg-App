@@ -149,6 +149,7 @@ void main() {
         'audio': {
           'protocols': [legacyAudioMode],
           'supportsOpusDecoder': false,
+          'micFormats': ['pcm16le'],
           'secureContext': true,
           'decoder': {
             'nativeOpus': false,
@@ -185,6 +186,24 @@ void main() {
         }),
         legacyAudioMode,
       );
+    });
+
+    test('advertises native encoding independently of receive decoding', () {
+      final encodeOnly = capabilitiesPacket(opusEncoder: true)['audio'] as Map;
+      expect(encodeOnly['protocols'], ['legacy']);
+      expect(encodeOnly['supportsOpusDecoder'], false);
+      expect(encodeOnly['micFormats'], ['opus', 'pcm16le']);
+      final decodeOnly = capabilitiesPacket(opusDecoder: true)['audio'] as Map;
+      expect(decodeOnly['protocols'], ['legacy', 'svg-v2']);
+      expect(decodeOnly['supportsOpusDecoder'], true);
+      expect(decodeOnly['micFormats'], ['pcm16le']);
+      expect((decodeOnly['decoder'] as Map)['nativeOpus'], true);
+    });
+
+    test('only recognized Opus policy messages are localized', () {
+      expect(isOpusMicrophoneRequired('Opus microphone audio is required.'), true);
+      expect(isOpusMicrophoneRequired('This server requires Opus microphone audio. Use an Opus-capable client.'), true);
+      expect(isOpusMicrophoneRequired('Custom Opus microphone maintenance message'), false);
     });
 
     test('normalizes control packet types and detects connected status', () {
@@ -628,6 +647,101 @@ void main() {
     });
   });
 
+  group('server version discovery', () {
+    test('reads PROJECT_VERSION from the web root next to /ws', () async {
+      Uri? requested;
+      final version = await discoverServerVersion(
+        Uri.parse('wss://example.com:8443/svg/ws'),
+        fetchPage: (uri) async {
+          requested = uri;
+          return '<script>window.PROJECT_VERSION = "0.1.4";</script>';
+        },
+      );
+
+      expect(requested.toString(), 'https://example.com:8443/svg/');
+      expect(version, '0.1.4');
+    });
+
+    test('returns null when the page is missing, unparseable or throws', () async {
+      final uri = Uri.parse('ws://example.com/ws');
+      expect(await discoverServerVersion(uri, fetchPage: (_) async => null), null);
+      expect(
+        await discoverServerVersion(uri, fetchPage: (_) async => '<html/>'),
+        null,
+      );
+      expect(
+        await discoverServerVersion(uri, fetchPage: (_) async => throw 'boom'),
+        null,
+      );
+    });
+
+    test('recognizes lookup and unreachable failures but not a refusal', () {
+      expect(isNetworkDownError("SocketException: Failed host lookup: 'a'"), true);
+      expect(
+        isNetworkDownError('SocketException: Connection failed (OS Error: Network is unreachable, errno = 101)'),
+        true,
+      );
+      expect(
+        isNetworkDownError('SocketException: Connection refused (OS Error: Connection refused, errno = 111)'),
+        false,
+      );
+    });
+
+    test('orders targets with the discovered version first', () {
+      expect(serverVersionTargets('0.1.3'), ['0.1.3', '0.1.5', '0.1.4']);
+      expect(serverVersionTargets('0.1.6'), ['0.1.5', '0.1.4', '0.1.3']);
+      expect(serverVersionTargets(null), ['0.1.5', '0.1.4', '0.1.3']);
+    });
+
+    test('joins with the discovered version and still advances on 4008', () async {
+      final sockets = [_FakeVoiceWebSocket(), _FakeVoiceWebSocket()];
+      var connects = 0;
+      final client = SimpleVoiceClient(
+        Uri.parse('ws://voice.example.com/ws'),
+        connector: (_) async => sockets[connects++],
+      );
+
+      await client.connect(
+        username: 'PlayerName',
+        password: 'secret',
+        discoveredVersion: '0.1.3',
+        onControlPacket: (_) {},
+        onAudioFrame: (_) {},
+        onClosed: (_, _) {},
+      );
+      expect(
+        (_sentJoin(sockets[0])['clientType'] as Map)['serverVersion'],
+        '0.1.3',
+      );
+
+      await sockets[0].finish(
+        code: outdatedClientCloseCode,
+        reason: appProtocolUnsupportedReason,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        (_sentJoin(sockets[1])['clientType'] as Map)['serverVersion'],
+        '0.1.5',
+      );
+    });
+
+    test('treats fatal flags and known fatal texts as non-retryable', () {
+      expect(isFatalServerError({'type': 'error', 'fatal': true}), true);
+      expect(
+        isFatalServerError({
+          'type': 'error',
+          'message': 'Timeout: You didn’t join the server in time.',
+        }),
+        true,
+      );
+      expect(
+        isFatalServerError({'type': 'error', 'message': 'Invalid capabilities payload.'}),
+        false,
+      );
+      expect(isFatalServerError({'type': 'status', 'message': 'timeout'}), false);
+    });
+  });
+
   group('reconnect policy', () {
     test('allows generic close to reconnect while attempts remain', () {
       expect(shouldReconnect(closeCode: 1001, attempts: 0), true);
@@ -637,17 +751,6 @@ void main() {
       for (final code in [4001, 4003, 4004, 4005, 4006, 4008]) {
         expect(shouldReconnect(closeCode: code, attempts: 0), false);
       }
-    });
-
-    test('humanizes unsupported Android protocol close reason', () {
-      expect(
-        closeMessage(closeCode: 4008, reason: appProtocolUnsupportedReason),
-        appProtocolUnsupportedMessage,
-      );
-      expect(
-        closeMessage(closeCode: 1001, reason: 'server_restart'),
-        'The server disconnected you: server_restart',
-      );
     });
 
     test('stops after five attempts', () {
