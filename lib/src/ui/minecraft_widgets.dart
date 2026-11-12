@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show EagerGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -240,6 +241,7 @@ class HoldToTalk extends StatefulWidget {
 
 class _HoldToTalkState extends State<HoldToTalk> with WidgetsBindingObserver {
   bool _talking = false;
+  int? _pointer;
 
   @override
   void initState() {
@@ -271,6 +273,17 @@ class _HoldToTalkState extends State<HoldToTalk> with WidgetsBindingObserver {
     widget.onTalkingChanged(talking);
   }
 
+  bool _inside(PointerEvent event) {
+    final box = context.findRenderObject() as RenderBox;
+    return box.size.contains(box.globalToLocal(event.position));
+  }
+
+  void _release(PointerEvent event) {
+    if (event.pointer != _pointer) return;
+    _pointer = null;
+    _setTalking(false);
+  }
+
   @override
   void dispose() {
     widget.available.removeListener(_availabilityChanged);
@@ -298,29 +311,47 @@ class _HoldToTalkState extends State<HoldToTalk> with WidgetsBindingObserver {
             },
           ),
         },
-        child: GestureDetector(
-          excludeFromSemantics: true,
-          onTapDown: enabled ? (_) => _setTalking(true) : null,
-          onTapUp: (_) => _setTalking(false),
-          onTapCancel: () => _setTalking(false),
-          child: Container(
-            width: double.infinity,
-            constraints: const BoxConstraints(minHeight: 64),
-            alignment: Alignment.center,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: !enabled
-                  ? const Color(0xFF666666)
-                  : _talking
-                  ? const Color(0xFF326F20)
-                  : const Color(0xFF4C4879),
-              border: Border.all(color: const Color(0xFF232323), width: 3),
-            ),
-            child: ExcludeSemantics(
-              child: Text(
-                _talking ? widget.talkingLabel : widget.label,
-                textAlign: TextAlign.center,
-                style: pixelHeading.copyWith(color: Colors.white),
+        child: Listener(
+          onPointerDown: enabled
+              ? (event) {
+                  _pointer = event.pointer;
+                  _setTalking(true);
+                }
+              : null,
+          onPointerMove: (event) {
+            if (event.pointer == _pointer) _setTalking(_inside(event));
+          },
+          onPointerUp: _release,
+          onPointerCancel: _release,
+          // The eager recognizer claims the touch so a surrounding scroll view never scrolls while a finger is on the button.
+          child: RawGestureDetector(
+            gestures: enabled
+                ? {
+                    EagerGestureRecognizer:
+                        GestureRecognizerFactoryWithHandlers<
+                          EagerGestureRecognizer
+                        >(EagerGestureRecognizer.new, (_) {}),
+                  }
+                : const {},
+            child: Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(minHeight: 64),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: !enabled
+                    ? const Color(0xFF666666)
+                    : _talking
+                    ? const Color(0xFF326F20)
+                    : const Color(0xFF4C4879),
+                border: Border.all(color: const Color(0xFF232323), width: 3),
+              ),
+              child: ExcludeSemantics(
+                child: Text(
+                  _talking ? widget.talkingLabel : widget.label,
+                  textAlign: TextAlign.center,
+                  style: pixelHeading.copyWith(color: Colors.white),
+                ),
               ),
             ),
           ),
