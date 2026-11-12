@@ -1,4 +1,4 @@
-package com.example.simple_voice_app
+package com.svg.svg_app
 
 import android.app.RemoteInput
 import android.content.BroadcastReceiver

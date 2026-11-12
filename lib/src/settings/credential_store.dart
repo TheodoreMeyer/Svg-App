@@ -14,13 +14,20 @@ class SavedCredentials {
 
 class CredentialStore {
   CredentialStore({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   static const _serverKey = 'server_url';
   static const _usernameKey = 'username';
   static const _passwordKey = 'password';
+  static const _languageKey = 'preferred_language';
 
   final FlutterSecureStorage _storage;
+
+  Future<String?> loadLanguage() => _storage.read(key: _languageKey);
+
+  Future<void> saveLanguage(String? language) => language == null
+      ? _storage.delete(key: _languageKey)
+      : _storage.write(key: _languageKey, value: language);
 
   Future<SavedCredentials> load() async {
     return SavedCredentials(

@@ -20,6 +20,7 @@ abstract interface class CallNotificationBridge {
     required bool muted,
     required bool speaker,
     String transientStatus = '',
+    Map<String, String> labels = const {},
   });
 
   Future<void> update({
@@ -28,6 +29,7 @@ abstract interface class CallNotificationBridge {
     required bool muted,
     required bool speaker,
     String transientStatus = '',
+    Map<String, String> labels = const {},
   });
 
   Future<void> stop();
@@ -37,10 +39,12 @@ class NativeCallNotificationBridge implements CallNotificationBridge {
   NativeCallNotificationBridge({
     MethodChannel? methodChannel,
     EventChannel? eventChannel,
-  })  : _methodChannel =
-            methodChannel ?? const MethodChannel('simple_voice_app/notification'),
-        _eventChannel = eventChannel ??
-            const EventChannel('simple_voice_app/notification_actions');
+  }) : _methodChannel =
+           methodChannel ??
+           const MethodChannel('simple_voice_app/notification'),
+       _eventChannel =
+           eventChannel ??
+           const EventChannel('simple_voice_app/notification_actions');
 
   final MethodChannel _methodChannel;
   final EventChannel _eventChannel;
@@ -77,15 +81,20 @@ class NativeCallNotificationBridge implements CallNotificationBridge {
     required bool muted,
     required bool speaker,
     String transientStatus = '',
+    Map<String, String> labels = const {},
   }) async {
     try {
-      await _methodChannel.invokeMethod<void>('start', _payload(
-        server: server,
-        status: status,
-        muted: muted,
-        speaker: speaker,
-        transientStatus: transientStatus,
-      ));
+      await _methodChannel.invokeMethod<void>(
+        'start',
+        _payload(
+          server: server,
+          status: status,
+          muted: muted,
+          speaker: speaker,
+          transientStatus: transientStatus,
+          labels: labels,
+        ),
+      );
     } on MissingPluginException {
       return;
     }
@@ -98,15 +107,20 @@ class NativeCallNotificationBridge implements CallNotificationBridge {
     required bool muted,
     required bool speaker,
     String transientStatus = '',
+    Map<String, String> labels = const {},
   }) async {
     try {
-      await _methodChannel.invokeMethod<void>('update', _payload(
-        server: server,
-        status: status,
-        muted: muted,
-        speaker: speaker,
-        transientStatus: transientStatus,
-      ));
+      await _methodChannel.invokeMethod<void>(
+        'update',
+        _payload(
+          server: server,
+          status: status,
+          muted: muted,
+          speaker: speaker,
+          transientStatus: transientStatus,
+          labels: labels,
+        ),
+      );
     } on MissingPluginException {
       return;
     }
@@ -127,6 +141,7 @@ class NativeCallNotificationBridge implements CallNotificationBridge {
     required bool muted,
     required bool speaker,
     required String transientStatus,
+    required Map<String, String> labels,
   }) {
     return {
       'server': server,
@@ -134,6 +149,7 @@ class NativeCallNotificationBridge implements CallNotificationBridge {
       'muted': muted,
       'speaker': speaker,
       'transientStatus': transientStatus,
+      'labels': labels,
     };
   }
 }

@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Create a report to help us improve/fix bugs
+about: Report a bug in the Svg-App Android companion
 title: "[BUG]- name"
 labels: ''
 assignees: ''
@@ -29,10 +29,11 @@ A clear and concise description of what you expected to happen.
 If applicable, add screenshots to help explain your problem.
 
 
-**Smartphone (please complete the following information if applicable):**
- - Device: [e.g. iPhone 16]
- - OS: [e.g. iOS8.1]
- - App Version [e.g. 1.0.1]
+**Android device:**
+ - Device model: [e.g. Samsung Galaxy S24]
+ - Android version: [e.g. Android 14]
+ - Svg-App version and build: [e.g. 1.1.0+4]
+ - SimpleVoice-Geyser version:
 
 **Additional context**
 Add any other context about the problem here.

@@ -1,44 +1,39 @@
 import 'dart:typed_data';
+import 'dart:math' as math;
 
-Uint8List floatsToPcm16(Float32List samples) {
-  final bytes = Uint8List(samples.length * 2);
-  final view = ByteData.sublistView(bytes);
-  for (var i = 0; i < samples.length; i++) {
-    final sample = samples[i].clamp(-1.0, 1.0);
-    final value = sample < 0 ? sample * 32768 : sample * 32767;
-    view.setInt16(i * 2, value.round(), Endian.little);
+Uint8List spatialPcm16(
+  Uint8List bytes, {
+  required int channels,
+  required double pan,
+  required double gain,
+}) {
+  if (bytes.lengthInBytes % (channels * 2) != 0) {
+    throw const FormatException('Incomplete PCM sample.');
   }
-  return bytes;
-}
-
-Float32List pcm16ToFloats(Uint8List bytes) {
-  final sampleCount = bytes.lengthInBytes ~/ 2;
-  final samples = Float32List(sampleCount);
-  final view = ByteData.sublistView(bytes);
-  for (var i = 0; i < sampleCount; i++) {
-    samples[i] = view.getInt16(i * 2, Endian.little) / 32768.0;
+  final frames = bytes.lengthInBytes ~/ (channels * 2);
+  final input = ByteData.sublistView(bytes);
+  final output = Uint8List(frames * 4);
+  final view = ByteData.sublistView(output);
+  final angle = (pan.clamp(-1.0, 1.0) + 1) * math.pi / 4;
+  final left = math.cos(angle) * gain.clamp(0.0, 1.0);
+  final right = math.sin(angle) * gain.clamp(0.0, 1.0);
+  for (var i = 0; i < frames; i++) {
+    final offset = i * channels * 2;
+    final mono = channels == 1
+        ? input.getInt16(offset, Endian.little).toDouble()
+        : (input.getInt16(offset, Endian.little) +
+                  input.getInt16(offset + 2, Endian.little)) /
+              2;
+    view.setInt16(
+      i * 4,
+      (mono * left).round().clamp(-32768, 32767),
+      Endian.little,
+    );
+    view.setInt16(
+      i * 4 + 2,
+      (mono * right).round().clamp(-32768, 32767),
+      Endian.little,
+    );
   }
-  return samples;
-}
-
-class PcmPacketizer {
-  PcmPacketizer({this.packetSamples = 960});
-
-  final int packetSamples;
-  final List<double> _buffer = [];
-
-  List<Uint8List> add(Float32List samples) {
-    _buffer.addAll(samples);
-    final packets = <Uint8List>[];
-    while (_buffer.length >= packetSamples) {
-      final packet = Float32List(packetSamples);
-      for (var i = 0; i < packetSamples; i++) {
-        packet[i] = _buffer.removeAt(0);
-      }
-      packets.add(floatsToPcm16(packet));
-    }
-    return packets;
-  }
-
-  void clear() => _buffer.clear();
+  return output;
 }

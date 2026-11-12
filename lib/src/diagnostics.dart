@@ -2,6 +2,7 @@ enum AppConnectionState {
   idle,
   connecting,
   authenticated,
+  transferring,
   connected,
   degraded,
   fatalError,
@@ -16,6 +17,7 @@ class DiagnosticsSnapshot {
     this.lastCloseCode,
     this.lastCloseReason = '',
     this.selectedAudioMode = 'legacy',
+    this.selectedMicFormat = 'pcm16le',
     this.decoderStatus = 'not enabled',
     this.malformedFrames = 0,
     this.receivedLegacyFrames = 0,
@@ -41,6 +43,7 @@ class DiagnosticsSnapshot {
   final int? lastCloseCode;
   final String lastCloseReason;
   final String selectedAudioMode;
+  final String selectedMicFormat;
   final String decoderStatus;
   final int malformedFrames;
   final int receivedLegacyFrames;
@@ -66,6 +69,7 @@ class DiagnosticsSnapshot {
     int? lastCloseCode,
     String? lastCloseReason,
     String? selectedAudioMode,
+    String? selectedMicFormat,
     String? decoderStatus,
     int? malformedFrames,
     int? receivedLegacyFrames,
@@ -91,6 +95,7 @@ class DiagnosticsSnapshot {
       lastCloseCode: lastCloseCode ?? this.lastCloseCode,
       lastCloseReason: lastCloseReason ?? this.lastCloseReason,
       selectedAudioMode: selectedAudioMode ?? this.selectedAudioMode,
+      selectedMicFormat: selectedMicFormat ?? this.selectedMicFormat,
       decoderStatus: decoderStatus ?? this.decoderStatus,
       malformedFrames: malformedFrames ?? this.malformedFrames,
       receivedLegacyFrames: receivedLegacyFrames ?? this.receivedLegacyFrames,
@@ -98,12 +103,10 @@ class DiagnosticsSnapshot {
       unsupportedOpusFrames:
           unsupportedOpusFrames ?? this.unsupportedOpusFrames,
       micPacketsSent: micPacketsSent ?? this.micPacketsSent,
-      micPermissionGranted:
-          micPermissionGranted ?? this.micPermissionGranted,
+      micPermissionGranted: micPermissionGranted ?? this.micPermissionGranted,
       micRunning: micRunning ?? this.micRunning,
       playbackRunning: playbackRunning ?? this.playbackRunning,
-      speakerphoneEnabled:
-          speakerphoneEnabled ?? this.speakerphoneEnabled,
+      speakerphoneEnabled: speakerphoneEnabled ?? this.speakerphoneEnabled,
       audioRoute: audioRoute ?? this.audioRoute,
       audioDebugInfo: audioDebugInfo ?? this.audioDebugInfo,
       lastReceivedPcmChannels:
@@ -122,6 +125,7 @@ class DiagnosticsSnapshot {
       'State: ${state.name}',
       'Last close: ${lastCloseCode ?? 'none'} $lastCloseReason'.trim(),
       'Audio: $selectedAudioMode',
+      'Microphone format: $selectedMicFormat',
       'Decoder: $decoderStatus',
       'Malformed frames: $malformedFrames',
       'Legacy frames: $receivedLegacyFrames',

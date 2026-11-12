@@ -30,9 +30,12 @@ class SimpleVoiceClient {
   final VoiceWebSocketConnector _connector;
   VoiceWebSocket? _socket;
   StreamSubscription<dynamic>? _subscription;
-  int _attempts = 0;
   bool _manualClose = false;
   bool _authenticated = false;
+  bool _transferring = false;
+  bool _capabilitiesSent = false;
+  int _generation = 0;
+  List<String> _targets = supportedTargetServerVersions;
 
   Future<void> connect({
     required String username,
@@ -40,10 +43,15 @@ class SimpleVoiceClient {
     required void Function(Map<String, Object?> packet) onControlPacket,
     required void Function(Uint8List bytes) onAudioFrame,
     required void Function(int? code, String reason) onClosed,
+    void Function()? onJoinAttempt,
+    String? discoveredVersion,
   }) async {
+    final generation = ++_generation;
+    _targets = serverVersionTargets(discoveredVersion);
     _manualClose = false;
     _authenticated = false;
-    _attempts = 0;
+    _transferring = false;
+    _capabilitiesSent = false;
     await _connectWithServerVersion(
       username: username,
       password: password,
@@ -51,6 +59,8 @@ class SimpleVoiceClient {
       onAudioFrame: onAudioFrame,
       onClosed: onClosed,
       targetIndex: 0,
+      generation: generation,
+      onJoinAttempt: onJoinAttempt,
     );
   }
 
@@ -61,11 +71,20 @@ class SimpleVoiceClient {
     required void Function(Uint8List bytes) onAudioFrame,
     required void Function(int? code, String reason) onClosed,
     required int targetIndex,
+    required int generation,
+    void Function()? onJoinAttempt,
   }) async {
+    if (generation != _generation || _manualClose) return;
+    onJoinAttempt?.call();
     final socket = await _connector(websocketUri);
+    if (generation != _generation || _manualClose) {
+      await socket.close();
+      return;
+    }
     _socket = socket;
     _subscription = socket.listen(
       (event) {
+        if (generation != _generation || !identical(_socket, socket)) return;
         if (event is String) {
           final decoded = jsonDecode(event);
           if (decoded is Map) {
@@ -78,6 +97,9 @@ class SimpleVoiceClient {
             }
             if (isConnectedStatusPacket(packet)) {
               _authenticated = true;
+              _transferring = false;
+            } else if (_authenticated && isTransferStatusPacket(packet)) {
+              _transferring = true;
             }
             onControlPacket(packet);
           }
@@ -86,6 +108,8 @@ class SimpleVoiceClient {
         }
       },
       onDone: () {
+        if (generation != _generation || !identical(_socket, socket)) return;
+        _socket = null;
         final code = socket.closeCode;
         final reason = socket.closeReason ?? '';
         if (_shouldRetryWithNextServerVersion(
@@ -101,20 +125,18 @@ class SimpleVoiceClient {
               onAudioFrame: onAudioFrame,
               onClosed: onClosed,
               targetIndex: targetIndex + 1,
+              generation: generation,
+              onJoinAttempt: onJoinAttempt,
             ).catchError((Object error) {
-              onClosed(null, error.toString());
+              if (generation == _generation && !_manualClose) {
+                onClosed(null, error.toString());
+              }
             }),
           );
           return;
         }
+        _authenticated = false;
         onClosed(code, reason);
-        if (shouldReconnect(
-          closeCode: code,
-          attempts: _attempts,
-          manualClose: _manualClose,
-        )) {
-          _attempts++;
-        }
       },
     );
     socket.add(
@@ -122,7 +144,7 @@ class SimpleVoiceClient {
         joinPacket(
           username: username,
           password: password,
-          serverVersion: supportedTargetServerVersions[targetIndex],
+          serverVersion: _targets[targetIndex],
         ),
       ),
     );
@@ -152,26 +174,47 @@ class SimpleVoiceClient {
   }
 
   bool _hasNextServerVersion(int targetIndex) {
-    return targetIndex + 1 < supportedTargetServerVersions.length;
+    return targetIndex + 1 < _targets.length;
   }
 
   void sendChat(String message) {
+    if (!_authenticated || _transferring || _manualClose) return;
     _socket?.add(jsonEncode(chatPacket(message)));
   }
 
-  void sendCapabilities() {
-    _socket?.add(jsonEncode(capabilitiesPacket()));
+  void sendCapabilities({
+    bool opusEncoder = false,
+    bool opusDecoder = false,
+    bool renegotiate = false,
+  }) {
+    if (!_authenticated ||
+        _transferring ||
+        (_capabilitiesSent && !renegotiate) ||
+        _socket == null) {
+      return;
+    }
+    _capabilitiesSent = true;
+    _socket?.add(
+      jsonEncode(
+        capabilitiesPacket(opusEncoder: opusEncoder, opusDecoder: opusDecoder),
+      ),
+    );
   }
 
   void sendMicPacket(Uint8List packet) {
+    if (!_authenticated || _transferring || _manualClose) return;
     _socket?.add(packet);
   }
 
   Future<void> disconnect() async {
     _manualClose = true;
-    await _subscription?.cancel();
-    await _socket?.close();
+    ++_generation;
+    _authenticated = false;
+    final socket = _socket;
     _socket = null;
+    await _subscription?.cancel();
+    _subscription = null;
+    await socket?.close();
   }
 }
 

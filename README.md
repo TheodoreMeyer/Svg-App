@@ -1,117 +1,54 @@
 <p align="center">
-  <img src="assets/images/icon.png" alt="Simple Voice App icon" width="96" height="96">
+  <img src="assets/images/icon.png" alt="Svg-App icon" width="96" height="96">
 </p>
 
-# Simple Voice App
+# Svg-App
 
-Simple Voice App is a Flutter Android companion app for SimpleVoice-Geyser. It lets Bedrock players join voice chat and server chat from an Android device without using the browser WebUI.
+Svg-App is the official Android companion for [SimpleVoice-Geyser](https://github.com/TheodoreMeyer/SimpleVoice-Geyser), bringing voice and server chat to Bedrock players.
 
-Current app version: `1.0.2+3`.
+## What's new in 1.1.0
 
-## Current Features
+- **Opus audio:** native Opus microphone encoding and `svg-v2` spatial playback, using your phone's built-in codecs, with PCM fallback when the server allows it.
+- **Minecraft-inspired UI:** Now the svg-app matches the UI from the Simple Voice Geyser plugin, with textured backgrounds, beveled controls, and dedicated Voice and Chat tabs.
+- **Four languages:** English, Polski, Italiano, and Español. By default and if it's available, the svg-app will follow your device language, otherwise, you can choose one of the current available options and switch during a call without having to reconnect.
+- **Improved push-to-talk:** inline hold-to-talk and fullscreen controls, with screen-reader support.
+- **Localized notifications:** mute, change audio output, reply to chat, or leave the call from Android's notification controls.
+- **Connection updates:** support for SimpleVoice-Geyser 0.1.5 and Velocity server switching, alongside existing 0.1.4 and 0.1.3 compatibility.
+- **Reliable connections:** the app detects your server's version automatically, reconnects after a dropped connection, and tells you when your phone has no internet connection or when a server does not allow the app.
+- **Clearer call controls:** connection status, microphone and playback details, and a live diagnostics panel, with layouts that accommodate large text and landscape.
+- **App optimization:** Previously the app had unnecessary architecture compatibility, this has been dropped and it's now lighter for all devices.
 
-- Android-first Flutter app with a short opening splash.
-- Server, username, and password join screen with inline validation.
-- Password visibility toggle and optional secure password storage.
-- Direct websocket connection to the SimpleVoice-Geyser `/ws` route.
-- Android native microphone capture with `AudioRecord`.
-- Android native PCM playback with `AudioTrack`.
-- Phone earpiece and speaker output toggle.
-- Open mic, mute, and push-to-talk controls.
-- Foreground call notification with mute, speaker, hang up, and inline chat reply actions.
-- Voice and Chat tabs after joining.
-- Local Test Audio monitor for microphone/playback checks.
-- Diagnostics panel with connection, websocket, audio route, native audio devtools, frame counters, mic counters, and chat counters.
+**Note:** This new version also fixed an ID issue on the app, if you update as is, you will have 2 installations on your device; 1.0.2 and 1.1.0. Make sure to delete the previous one before updating to this newest version. Your saved servers and passwords are not carried over, so you will need to enter them again.
+
+**Disclaimer:** This will only happen on this version, any future releases after 1.1.0 will install as updates correctly.
 
 ## Download
+For most users, you should just download the latest apk available from [Releases](https://github.com/TheodoreMeyer/Svg-App/releases) and follow step 2 below.
 
-Most users should install the app from the latest GitHub Release. Download the newest `.apk` attached to the release, install it on your Android device, and grant microphone and notification permissions when prompted.
+## Getting started
 
-## Requirements
+Requires **Android 7.0 or later** and a SimpleVoice-Geyser server (0.1.3, 0.1.4 or 0.1.5) with app/web access enabled. Opus microphone audio needs a 0.1.5 server and a phone whose built-in codec supports it, typically Android 10 or later; otherwise the app uses PCM where the server allows it.
 
-- Flutter installed locally.
-- Android SDK and a physical Android device for reliable voice testing.
-- A SimpleVoice-Geyser server exposing the app/web websocket route.
-- Microphone permission granted for sending voice.
+1. Install an APK (always recommended to install latest) from [Releases](https://github.com/TheodoreMeyer/Svg-App/releases), or build it from source.
+2. Enter the server's web address, username, and password. Use the SimpleVoice-Geyser web port, not the Minecraft gameplay port.
+3. Tap **Join**, grant microphone permission to speak, and choose Open mic or push-to-talk.
 
-## Connection
+You can save your credentials, test your microphone before joining, and switch between speaker and phone earpiece. Voice and chat controls remain accessible from either tab.
 
-The app derives the websocket route from the server field.
+PTT stops when the app is backgrounded. The notification's **Unmute** action enables Open mic so you can speak while the app is in the background.
 
-Examples:
 
-```text
-server.com                -> wss://server.com/ws
-mc.server.com             -> wss://mc.server.com/ws
-server.com/voice/         -> wss://server.com/voice/ws
-http://192.168.1.91:24455 -> ws://192.168.1.91:24455/ws
+## Build from source
+
+With Flutter and the Android SDK installed, run from the project directory:
+
+```sh
+flutter pub get
+flutter build apk --release --target-platform=android-arm64 --split-debug-info=build/symbols/arm64-v8a
 ```
 
-For local testing, enter the SimpleVoice-Geyser web/app port, not the Minecraft gameplay port. If the field uses `:25565`, the app shows an inline warning because that is usually the Minecraft server port.
+The APK is generated at `build/app/outputs/flutter-apk/app-release.apk`. Keep the matching files from `build/symbols/arm64-v8a/` for crash diagnosis. Release builds are signed with the project's private release key, which is not part of this repository. To build a release yourself, put your own keystore and a `key.properties` file (`storeFile`, `keyAlias`, `storePassword`, `keyPassword`) in a `signing` folder next to the project folder; without it the release build stops with a missing-keystore error. Debug builds need no key.
 
-For host-only public addresses, the app can also read discovery metadata from:
+## Credits
 
-```text
-https://<host>/.well-known/simplevoice-geyser.json
-```
-
-If discovery is not available, the app falls back to `wss://<host>/ws`.
-
-## Audio Behavior
-
-- Incoming legacy PCM is played through native Android playback.
-- `svg-v2` PCM frames are parsed and played.
-- `svg-v2` Opus frames are counted in diagnostics but are not decoded in this app version.
-- Incoming stereo PCM is preserved on stereo-capable output routes.
-- Earpiece output is treated as mono-safe so one side of spatial audio is not lost.
-- Speaker mode uses the media-style speaker path for normal usable volume.
-- Mic send uses mono PCM16 packets from Android microphone capture.
-
-## Chat
-
-The app sends trimmed plain text chat messages after authentication. Empty messages are ignored. Incoming server chat, status, and error messages are shown in the Chat tab timeline.
-
-## Notifications
-
-While connected, the Android foreground notification keeps the call active when the app is backgrounded. It provides quick actions for mute/unmute, speaker/earpiece, hang up, and inline chat replies using Android notification `RemoteInput`.
-
-## Diagnostics
-
-The diagnostics button opens a compact text panel for bug reports and manual testing. It excludes passwords and raw audio. It includes:
-
-- Server and websocket URL.
-- Connection state and last close reason.
-- Selected audio mode and decoder status.
-- Native audio mode, preferred playback device, media/call volume, and route errors.
-- Received frame counters and last PCM peak.
-- Mic packet count and chat counters.
-
-## Build form source
-
-```powershell
-C:\tools\flutter\bin\flutter.bat pub get
-C:\tools\flutter\bin\flutter.bat test
-C:\tools\flutter\bin\flutter.bat analyze
-C:\tools\flutter\bin\flutter.bat build apk --debug
-```
-
-The debug APK is generated under:
-
-```text
-build/app/outputs/flutter-apk/
-```
-
-## Manual Test Checklist (if you come across issues)
-
-1. Install the debug APK on a physical Android device.
-2. Join a SimpleVoice-Geyser server.
-3. Confirm chat sends and receives.
-4. Confirm incoming voice plays.
-5. Confirm open mic sends voice.
-6. Confirm mute stops outbound voice while receive audio and chat continue.
-7. Confirm push-to-talk sends only while held.
-8. Toggle Speaker and confirm playback changes route and volume.
-9. Background the app and test notification actions.
-10. Open Diagnostics and confirm it contains route/audio details without passwords.
-11. Leave the call and confirm audio, notification, and websocket stop cleanly.
-
+Textures and shared wording are credited in [assets/NOTICE.md](assets/NOTICE.md). Press Start 2P is bundled under the [SIL Open Font License](assets/fonts/OFL.txt).

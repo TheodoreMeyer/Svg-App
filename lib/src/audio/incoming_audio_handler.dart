@@ -3,18 +3,22 @@ import 'dart:typed_data';
 import '../diagnostics.dart';
 import '../protocol/svg_v2_frame.dart';
 import 'audio_bridge.dart';
+import 'pcm.dart';
 
 class IncomingAudioHandler {
-  const IncomingAudioHandler(this._bridge);
+  IncomingAudioHandler(this._bridge);
 
   final AudioBridge _bridge;
+  int emptyOpusDecodes = 0;
 
   Future<DiagnosticsSnapshot> handle(
     Uint8List bytes,
-    DiagnosticsSnapshot diagnostics,
-  ) async {
+    DiagnosticsSnapshot diagnostics, {
+    bool opusDecoder = false,
+    bool Function()? isCurrent,
+  }) async {
     if (_looksLikeSvgV2(bytes)) {
-      return _handleSvgV2(bytes, diagnostics);
+      return _handleSvgV2(bytes, diagnostics, opusDecoder, isCurrent);
     }
 
     final channels = bytes.lengthInBytes % 4 == 0 ? 2 : 1;
@@ -30,27 +34,54 @@ class IncomingAudioHandler {
   Future<DiagnosticsSnapshot> _handleSvgV2(
     Uint8List bytes,
     DiagnosticsSnapshot diagnostics,
+    bool opusDecoder,
+    bool Function()? isCurrent,
   ) async {
     try {
       final frame = SvgV2Frame.parse(bytes);
-      switch (frame.codec) {
-        case SvgV2Codec.pcm16le:
-          await _bridge.playPcm16(frame.payload, channels: frame.channels);
-          return diagnostics.copyWith(
-            selectedAudioMode: 'svg-v2',
-            receivedSvgV2Frames: diagnostics.receivedSvgV2Frames + 1,
-            lastReceivedPcmChannels: frame.channels,
-            lastReceivedPcmPeak: _pcmPeak(frame.payload),
-          );
-        case SvgV2Codec.opus:
-          return diagnostics.copyWith(
-            state: AppConnectionState.degraded,
-            selectedAudioMode: 'svg-v2',
-            decoderStatus: 'Opus receive unsupported.',
-            unsupportedOpusFrames: diagnostics.unsupportedOpusFrames + 1,
-            receivedSvgV2Frames: diagnostics.receivedSvgV2Frames + 1,
-          );
+      // Simple Voice Chat ends a talk burst with an empty packet, which the plugin forwards as-is.
+      if (frame.payload.isEmpty) {
+        return diagnostics.copyWith(
+          selectedAudioMode: 'svg-v2',
+          receivedSvgV2Frames: diagnostics.receivedSvgV2Frames + 1,
+        );
       }
+      if (frame.codec == SvgV2Codec.opus && !opusDecoder) {
+        return diagnostics.copyWith(
+          state: AppConnectionState.degraded,
+          selectedAudioMode: 'svg-v2',
+          decoderStatus: 'Opus receive unsupported.',
+          unsupportedOpusFrames: diagnostics.unsupportedOpusFrames + 1,
+          receivedSvgV2Frames: diagnostics.receivedSvgV2Frames + 1,
+        );
+      }
+      final pcm = frame.codec == SvgV2Codec.opus
+          ? await _bridge.decodeOpus(frame.payload, channels: frame.channels)
+          : frame.payload;
+      if (isCurrent != null && !isCurrent()) return diagnostics;
+      if (frame.codec == SvgV2Codec.opus) {
+        if (pcm.isEmpty) {
+          emptyOpusDecodes++;
+          return diagnostics;
+        }
+        emptyOpusDecodes = 0;
+      }
+      final spatial = spatialPcm16(
+        pcm,
+        channels: frame.channels,
+        pan: frame.pan,
+        gain: frame.gain,
+      );
+      await _bridge.playPcm16(spatial, channels: 2);
+      return diagnostics.copyWith(
+        selectedAudioMode: 'svg-v2',
+        decoderStatus: frame.codec == SvgV2Codec.opus
+            ? 'Native Opus ready'
+            : diagnostics.decoderStatus,
+        receivedSvgV2Frames: diagnostics.receivedSvgV2Frames + 1,
+        lastReceivedPcmChannels: 2,
+        lastReceivedPcmPeak: _pcmPeak(spatial),
+      );
     } on FormatException {
       return diagnostics.copyWith(
         malformedFrames: diagnostics.malformedFrames + 1,

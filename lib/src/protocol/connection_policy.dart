@@ -4,6 +4,9 @@ const String appProtocolUnsupportedReason = 'app_protocol_unsupported';
 const String appProtocolUnsupportedMessage =
     'This app version is not compatible with this server. Update the app.';
 
+const String unsupportedClientTypeReason = 'unsupported_client_type';
+const String unsupportedClientTypeMessage = 'Unsupported client type.';
+
 const Set<int> noReconnectCloseCodes = {
   4001,
   4003,
@@ -27,19 +30,4 @@ bool shouldReconnect({
     return false;
   }
   return true;
-}
-
-String closeMessage({
-  required int? closeCode,
-  required String reason,
-}) {
-  final normalizedReason = reason.trim();
-  if (closeCode == outdatedClientCloseCode &&
-      normalizedReason == appProtocolUnsupportedReason) {
-    return appProtocolUnsupportedMessage;
-  }
-  if (normalizedReason.isEmpty) {
-    return '';
-  }
-  return 'The server disconnected you: $normalizedReason';
 }
