@@ -1,6 +1,15 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// A missing keystore fails the release build on purpose; there is no debug-key fallback.
+val signingDir = rootProject.file("../../signing")
+val signingProps = Properties().apply {
+    val file = File(signingDir, "key.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
 }
 
 android {
@@ -26,9 +35,18 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = File(signingDir, signingProps.getProperty("storeFile", "svg-app-release.jks"))
+            storePassword = signingProps.getProperty("storePassword")
+            keyAlias = signingProps.getProperty("keyAlias")
+            keyPassword = signingProps.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

@@ -6,8 +6,6 @@
 
 Svg-App is the official Android companion for [SimpleVoice-Geyser](https://github.com/TheodoreMeyer/SimpleVoice-Geyser), bringing voice and server chat to Bedrock players.
 
-> **Development status:** Final steps of Svg-App 1.1.0 for the official SimpleVoice-Geyser 0.1.5 release and final compatibility fixes.
-
 ## What's new in 1.1.0
 
 - **Opus audio:** native Opus microphone encoding and `svg-v2` spatial playback, using your phone's built-in codecs, with PCM fallback when the server allows it.
@@ -15,13 +13,14 @@ Svg-App is the official Android companion for [SimpleVoice-Geyser](https://githu
 - **Four languages:** English, Polski, Italiano, and Español. By default and if it's available, the svg-app will follow your device language, otherwise, you can choose one of the current available options and switch during a call without having to reconnect.
 - **Improved push-to-talk:** inline hold-to-talk and fullscreen controls, with screen-reader support.
 - **Localized notifications:** mute, change audio output, reply to chat, or leave the call from Android's notification controls.
-- **Connection updates:** support for upcoming 0.1.5 and Velocity server switching, alongside existing 0.1.4 and 0.1.3 compatibility.
-- **Reliable connections:** the app detects your server's version automatically, reconnects after a dropped connection, and tells you when your phone has no internet or when a server does not allow the app.
+- **Connection updates:** support for SimpleVoice-Geyser 0.1.5 and Velocity server switching, alongside existing 0.1.4 and 0.1.3 compatibility.
+- **Reliable connections:** the app detects your server's version automatically, reconnects after a dropped connection, and tells you when your phone has no internet connection or when a server does not allow the app.
 - **Clearer call controls:** connection status, microphone and playback details, and a live diagnostics panel, with layouts that accommodate large text and landscape.
 - **App optimization:** Previously the app had unnecessary architecture compatibility, this has been dropped and it's now lighter for all devices.
 
-Note: This new version also fixed an ID issue on the app, if you update as is, you will have 2 installations on your device; 1.0.2 and 1.1.0. Make sure to delete the previous one before updating to this newest version.
-Disclaimer: This will only happen on this version, any future updates after 1.1.0 will install as updates correctly.
+**Note:** This new version also fixed an ID issue on the app, if you update as is, you will have 2 installations on your device; 1.0.2 and 1.1.0. Make sure to delete the previous one before updating to this newest version. Your saved servers and passwords are not carried over, so you will need to enter them again.
+
+**Disclaimer:** This will only happen on this version, any future releases after 1.1.0 will install as updates correctly.
 
 ## Download
 For most users, you should just download the latest apk available from [Releases](https://github.com/TheodoreMeyer/Svg-App/releases) and follow step 2 below.
@@ -48,7 +47,7 @@ flutter pub get
 flutter build apk --release --target-platform=android-arm64 --split-debug-info=build/symbols/arm64-v8a
 ```
 
-The APK is generated at `build/app/outputs/flutter-apk/app-release.apk`. Keep the matching files from `build/symbols/arm64-v8a/` for crash diagnosis. The current configuration signs release-mode builds with the existing debug key.
+The APK is generated at `build/app/outputs/flutter-apk/app-release.apk`. Keep the matching files from `build/symbols/arm64-v8a/` for crash diagnosis. Release builds are signed with the project's private release key, which is not part of this repository. To build a release yourself, put your own keystore and a `key.properties` file (`storeFile`, `keyAlias`, `storePassword`, `keyPassword`) in a `signing` folder next to the project folder; without it the release build stops with a missing-keystore error. Debug builds need no key.
 
 ## Credits
 
