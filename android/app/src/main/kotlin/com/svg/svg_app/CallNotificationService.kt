@@ -1,5 +1,6 @@
 package com.svg.svg_app
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,6 +9,8 @@ import android.app.RemoteInput
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.Bundle
 import android.os.Build
 import android.os.IBinder
@@ -44,10 +47,23 @@ class CallNotificationService : Service() {
             SERVICE_START, SERVICE_UPDATE -> {
                 readState(intent)
                 createChannel()
-                startForeground(NOTIFICATION_ID, buildNotification())
+                startForegroundCompat(buildNotification())
             }
         }
         return START_NOT_STICKY
+    }
+
+    // Android rejects the microphone foreground type until RECORD_AUDIO is granted.
+    private fun startForegroundCompat(notification: Notification) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification)
+            return
+        }
+        var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        }
+        startForeground(NOTIFICATION_ID, notification, type)
     }
 
     private fun readState(intent: Intent) {
